@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm install:*)",
+      "Bash(del \"C:\\Users\\Josh.Seelan\\Documents\\partnerships-portal\\supabase-schema.sql\")",
+      "Bash(npx tsc:*)"
     ]
   }
 }

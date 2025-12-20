@@ -44,7 +44,7 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
 
   // Get recent activity (last 7 days)
   const sevenDaysAgo = subDays(new Date(), 7);
-  const recentPartners = partners.filter(p => isAfter(new Date(p.updated_at), sevenDaysAgo));
+  const recentPartners = partners.filter(p => isAfter(new Date(p.updated), sevenDaysAgo));
 
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -310,7 +310,7 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
                     {partner.status.charAt(0).toUpperCase() + partner.status.slice(1)}
                   </span>
                   <p className="text-xs text-blckbx-black/40 mt-1">
-                    {format(new Date(partner.updated_at), 'MMM d, h:mm a')}
+                    {format(new Date(partner.updated), 'MMM d, h:mm a')}
                   </p>
                 </div>
               </motion.div>

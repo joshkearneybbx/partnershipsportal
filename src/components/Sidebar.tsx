@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { PipelineStats } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
 
 type TabType = 'dashboard' | 'leads' | 'negotiation' | 'signed' | 'all' | 'partner-health';
 
@@ -72,6 +73,7 @@ const navItems: { id: TabType; label: string; icon: JSX.Element }[] = [
 
 export default function Sidebar({ activeTab, setActiveTab, pipelineStats, onExpandedChange }: SidebarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const { user, logout } = useAuth();
 
   const handleMouseEnter = () => {
     setIsExpanded(true);
@@ -170,15 +172,36 @@ export default function Sidebar({ activeTab, setActiveTab, pipelineStats, onExpa
       {/* Footer */}
       <div className={`border-t border-white/10 transition-all duration-300 ${isExpanded ? 'p-4' : 'p-2'}`}>
         <div className={`flex items-center text-blckbx-sand/60 ${isExpanded ? 'gap-3' : 'justify-center'}`}>
-          <div className="w-8 h-8 rounded-full bg-blckbx-cta/20 flex items-center justify-center flex-shrink-0">
-            <span className="text-blckbx-cta font-medium text-sm">JW</span>
-          </div>
+          {user?.avatar ? (
+            <img
+              src={user.avatar}
+              alt={user.name}
+              className="w-8 h-8 rounded-full flex-shrink-0"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-blckbx-cta/20 flex items-center justify-center flex-shrink-0">
+              <span className="text-blckbx-cta font-medium text-sm">
+                {user?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
+              </span>
+            </div>
+          )}
           <div className={`flex-1 min-w-0 overflow-hidden transition-all duration-300 ${
             isExpanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'
           }`}>
-            <p className="text-sm font-medium text-blckbx-sand truncate">Josh W.</p>
-            <p className="text-xs truncate">AI Solutions Engineer</p>
+            <p className="text-sm font-medium text-blckbx-sand truncate">{user?.name || 'User'}</p>
+            <p className="text-xs truncate">{user?.email || ''}</p>
           </div>
+          {isExpanded && (
+            <button
+              onClick={logout}
+              className="p-1.5 rounded hover:bg-white/10 transition-colors flex-shrink-0"
+              title="Sign out"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
     </aside>
