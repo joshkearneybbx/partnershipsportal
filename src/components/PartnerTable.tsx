@@ -29,8 +29,8 @@ export default function PartnerTable({
   onEditPartner,
   isLoading,
 }: PartnerTableProps) {
-  const [sortField, setSortField] = useState<SortField>('created');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [sortField, setSortField] = useState<SortField>('partner_name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -189,8 +189,6 @@ export default function PartnerTable({
                 </div>
               </th>
               <th className="p-4 font-medium text-sm whitespace-nowrap">Description</th>
-              <th className="p-4 font-medium text-sm whitespace-nowrap">Tier</th>
-              <th className="p-4 font-medium text-sm whitespace-nowrap">Tags</th>
               <th
                 className="p-4 font-medium text-sm cursor-pointer hover:bg-blckbx-cta/80 transition-colors whitespace-nowrap"
                 onClick={() => handleSort('lifestyle_category')}
@@ -206,8 +204,6 @@ export default function PartnerTable({
                 <>
                   <th className="p-4 font-medium text-sm whitespace-nowrap">Contact Name</th>
                   <th className="p-4 font-medium text-sm whitespace-nowrap">Contact Position</th>
-                  <th className="p-4 font-medium text-sm whitespace-nowrap">Contact Phone</th>
-                  <th className="p-4 font-medium text-sm whitespace-nowrap">Contact Email</th>
                 </>
               )}
               {currentTab !== 'all' && (
@@ -227,14 +223,6 @@ export default function PartnerTable({
               {currentTab === 'all' && (
                 <>
                   <th className="p-4 font-medium text-sm whitespace-nowrap">Partnership Type</th>
-                  <th className="p-4 font-medium text-sm whitespace-nowrap">Website</th>
-                  <th className="p-4 font-medium text-sm whitespace-nowrap">Partnership Link</th>
-                  <th className="p-4 font-medium text-sm whitespace-nowrap">Login Notes</th>
-                  <th className="p-4 font-medium text-sm whitespace-nowrap">Partner Brief</th>
-                  <th className="p-4 font-medium text-sm whitespace-nowrap">When Not To Use</th>
-                  <th className="p-4 font-medium text-sm whitespace-nowrap">SLA Notes</th>
-                  <th className="p-4 font-medium text-sm whitespace-nowrap text-center">Default</th>
-                  <th className="p-4 font-medium text-sm whitespace-nowrap">Lifecycle</th>
                   <th className="p-4 font-medium text-sm whitespace-nowrap">Status</th>
                 </>
               )}
@@ -307,27 +295,6 @@ export default function PartnerTable({
                           {partner.description || '-'}
                         </span>
                       </td>
-                      {/* Tier */}
-                      <td className="p-3">
-                        {partner.partner_tier && (
-                          <span className={`px-2 py-1 text-xs rounded-full font-medium whitespace-nowrap ${getTierBadgeStyle(partner.partner_tier)}`}>
-                            {partner.partner_tier}
-                          </span>
-                        )}
-                      </td>
-                      {/* Tags */}
-                      <td className="p-3">
-                        <div className="flex flex-wrap gap-1 max-w-[200px]">
-                          {partner.use_for_tags?.map((tag) => (
-                            <span
-                              key={tag}
-                              className={`px-1.5 py-0.5 text-[10px] rounded-full font-medium whitespace-nowrap ${getTagColor(tag)}`}
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
                       {/* Category */}
                       <td className="p-3">
                         <span className="px-2 py-1 text-xs rounded-full bg-blckbx-dark-sand text-blckbx-black/70 whitespace-nowrap">
@@ -339,14 +306,6 @@ export default function PartnerTable({
                         <>
                           <td className="p-3 text-sm text-blckbx-black/70 whitespace-nowrap">{partner.contact_name || '-'}</td>
                           <td className="p-3 text-sm text-blckbx-black/70 whitespace-nowrap">{partner.contact_position || '-'}</td>
-                          <td className="p-3 text-sm text-blckbx-black/70 whitespace-nowrap">{partner.contact_phone || '-'}</td>
-                          <td className="p-3">
-                            {partner.contact_email ? (
-                              <a href={`mailto:${partner.contact_email}`} className="text-blckbx-cta hover:underline text-sm whitespace-nowrap">
-                                {partner.contact_email}
-                              </a>
-                            ) : '-'}
-                          </td>
                         </>
                       ) : (
                         <td className="p-3">
@@ -383,60 +342,6 @@ export default function PartnerTable({
                                 : 'bg-purple-100 text-purple-700'
                             }`}>
                               {partner.partnership_type}
-                            </span>
-                          </td>
-                          {/* Website */}
-                          <td className="p-3">
-                            {partner.website ? (
-                              <a href={partner.website} target="_blank" rel="noopener noreferrer" className="text-blckbx-cta hover:underline text-sm whitespace-nowrap">
-                                {partner.website.replace(/^https?:\/\//, '').substring(0, 25)}...
-                              </a>
-                            ) : '-'}
-                          </td>
-                          {/* Partnership Link */}
-                          <td className="p-3">
-                            {partner.partnership_link ? (
-                              <a href={partner.partnership_link} target="_blank" rel="noopener noreferrer" className="text-blckbx-cta hover:underline text-sm whitespace-nowrap">
-                                Link
-                              </a>
-                            ) : '-'}
-                          </td>
-                          {/* Login Notes */}
-                          <td className="p-3">
-                            <span className="text-sm text-blckbx-black/70 line-clamp-1 max-w-[150px]" title={partner.login_notes}>
-                              {partner.login_notes || '-'}
-                            </span>
-                          </td>
-                          {/* Partner Brief */}
-                          <td className="p-3">
-                            <span className="text-sm text-blckbx-black/70 line-clamp-1 max-w-[150px]" title={partner.partner_brief}>
-                              {partner.partner_brief || '-'}
-                            </span>
-                          </td>
-                          {/* When Not To Use */}
-                          <td className="p-3">
-                            {partner.when_not_to_use ? (
-                              <span className="text-sm text-red-600 line-clamp-1 max-w-[150px]" title={partner.when_not_to_use}>
-                                {partner.when_not_to_use}
-                              </span>
-                            ) : '-'}
-                          </td>
-                          {/* SLA Notes */}
-                          <td className="p-3">
-                            <span className="text-sm text-blckbx-black/70 line-clamp-1 max-w-[150px]" title={partner.sla_notes}>
-                              {partner.sla_notes || '-'}
-                            </span>
-                          </td>
-                          {/* Is Default */}
-                          <td className="p-3 text-center">
-                            {partner.is_default ? (
-                              <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-emerald-500 text-white">YES</span>
-                            ) : '-'}
-                          </td>
-                          {/* Lifecycle Stage */}
-                          <td className="p-3">
-                            <span className={`text-sm ${getLifecycleStyle(partner.lifecycle_stage)}`}>
-                              {partner.lifecycle_stage || '-'}
                             </span>
                           </td>
                           {/* Status */}
