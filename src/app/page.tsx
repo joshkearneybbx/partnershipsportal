@@ -21,7 +21,7 @@ import {
 } from '@/lib/pocketbase';
 import { sendToCore } from '@/lib/webhook';
 
-type TabType = 'dashboard' | 'leads' | 'negotiation' | 'signed' | 'all' | 'partner-health';
+type TabType = 'dashboard' | 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all' | 'partner-health';
 
 export default function Home() {
   const { user, isLoading: authLoading } = useAuth();
@@ -44,6 +44,7 @@ export default function Home() {
     avgDaysToSign: 0,
   });
   const [pipelineStats, setPipelineStats] = useState<PipelineStats>({
+    contacted: 0,
     leads: 0,
     negotiation: 0,
     signed: 0,
@@ -57,6 +58,7 @@ export default function Home() {
     } else {
       // Map tab names to status values (tabs are plural, statuses are singular)
       const statusMap: Record<string, string> = {
+        'contacted': 'contacted',
         'leads': 'lead',
         'negotiation': 'negotiation',
         'signed': 'signed',
@@ -127,9 +129,9 @@ export default function Home() {
     }
   };
 
-  const handleMovePartner = async (id: string, newStatus: PartnerStatus) => {
+  const handleMovePartner = async (id: string, newStatus: PartnerStatus, currentStatus?: PartnerStatus) => {
     try {
-      await updatePartnerStatus(id, newStatus);
+      await updatePartnerStatus(id, newStatus, currentStatus);
       await loadData();
     } catch (error) {
       console.error('Error moving partner:', error);
@@ -208,6 +210,8 @@ export default function Home() {
               >
                 {activeTab === 'dashboard'
                   ? 'Dashboard'
+                  : activeTab === 'contacted'
+                  ? 'Contacted'
                   : activeTab === 'leads'
                   ? 'Leads'
                   : activeTab === 'negotiation'
@@ -216,7 +220,7 @@ export default function Home() {
                   ? 'Signed Partners'
                   : activeTab === 'partner-health'
                   ? 'Partner Health'
-                  : 'All Partners'}
+                  : 'Partnership Directory'}
               </motion.h1>
               <p className="text-blckbx-black/60 mt-1">
                 {activeTab === 'dashboard'

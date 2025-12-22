@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { PipelineStats } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 
-type TabType = 'dashboard' | 'leads' | 'negotiation' | 'signed' | 'all' | 'partner-health';
+type TabType = 'dashboard' | 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all' | 'partner-health';
 
 interface SidebarProps {
   activeTab: TabType;
@@ -21,6 +21,15 @@ const navItems: { id: TabType; label: string; icon: JSX.Element }[] = [
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'contacted',
+    label: 'Contacted',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
       </svg>
     ),
   },
@@ -53,7 +62,7 @@ const navItems: { id: TabType; label: string; icon: JSX.Element }[] = [
   },
   {
     id: 'all',
-    label: 'All Partners',
+    label: 'Partnership Directory',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -87,6 +96,8 @@ export default function Sidebar({ activeTab, setActiveTab, pipelineStats, onExpa
 
   const getCount = (id: TabType): number | undefined => {
     switch (id) {
+      case 'contacted':
+        return pipelineStats.contacted;
       case 'leads':
         return pipelineStats.leads;
       case 'negotiation':
@@ -94,7 +105,7 @@ export default function Sidebar({ activeTab, setActiveTab, pipelineStats, onExpa
       case 'signed':
         return pipelineStats.signed;
       case 'all':
-        return pipelineStats.total;
+        return pipelineStats.total + pipelineStats.contacted; // Show all partners including contacted
       default:
         return undefined;
     }

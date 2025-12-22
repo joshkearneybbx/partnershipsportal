@@ -1,4 +1,4 @@
-export type PartnerStatus = 'lead' | 'negotiation' | 'signed';
+export type PartnerStatus = 'contacted' | 'lead' | 'negotiation' | 'signed';
 export type OpportunityType = 'Big Ticket' | 'Everyday' | 'Low Hanging';
 export type PartnershipType = 'Direct' | 'Affiliate';
 export type PartnerTier = 'Preferred' | 'Standard' | 'Test';
@@ -64,6 +64,7 @@ export interface Partner {
   // Timestamps
   created: string;
   updated: string;
+  lead_date: string | null;
   signed_at: string | null;
 }
 
@@ -80,10 +81,11 @@ export interface WeeklyStats {
 }
 
 export interface PipelineStats {
+  contacted: number;
   leads: number;
   negotiation: number;
   signed: number;
-  total: number;
+  total: number; // Does NOT include contacted - only leads, negotiation, signed
 }
 
 export interface AuthUser {

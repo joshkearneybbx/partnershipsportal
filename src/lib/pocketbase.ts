@@ -82,12 +82,18 @@ export const updatePartner = async (
 
 export const updatePartnerStatus = async (
   id: string,
-  newStatus: string
+  newStatus: string,
+  currentStatus?: string
 ): Promise<Partner | null> => {
   try {
     const updates: Partial<Partner> = {
       status: newStatus as Partner['status'],
     };
+
+    // If moving from contacted to lead, set the lead_date timestamp
+    if (currentStatus === 'contacted' && newStatus === 'lead') {
+      updates.lead_date = new Date().toISOString();
+    }
 
     // If moving to signed, record the signed_at timestamp
     if (newStatus === 'signed') {
@@ -182,15 +188,21 @@ export const getPipelineStats = async () => {
     const records = await pb.collection(COLLECTION_NAME).getFullList();
     const partners = records as unknown as Partner[];
 
+    const contacted = partners.filter((p) => p.status === 'contacted').length;
+    const leads = partners.filter((p) => p.status === 'lead').length;
+    const negotiation = partners.filter((p) => p.status === 'negotiation').length;
+    const signed = partners.filter((p) => p.status === 'signed').length;
+
     return {
-      leads: partners.filter((p) => p.status === 'lead').length,
-      negotiation: partners.filter((p) => p.status === 'negotiation').length,
-      signed: partners.filter((p) => p.status === 'signed').length,
-      total: partners.length,
+      contacted,
+      leads,
+      negotiation,
+      signed,
+      total: leads + negotiation + signed, // Exclude contacted from pipeline total
     };
   } catch (error) {
     console.error('Error fetching pipeline stats:', error);
-    return { leads: 0, negotiation: 0, signed: 0, total: 0 };
+    return { contacted: 0, leads: 0, negotiation: 0, signed: 0, total: 0 };
   }
 };
 

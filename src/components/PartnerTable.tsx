@@ -7,9 +7,9 @@ import { format, differenceInDays } from 'date-fns';
 
 interface PartnerTableProps {
   partners: Partner[];
-  currentTab: 'leads' | 'negotiation' | 'signed' | 'all';
+  currentTab: 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all';
   onUpdate: (id: string, updates: Partial<Partner>) => Promise<void>;
-  onMove: (id: string, newStatus: PartnerStatus) => Promise<void>;
+  onMove: (id: string, newStatus: PartnerStatus, currentStatus?: PartnerStatus) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onSendToCore: (partner: Partner) => Promise<void>;
   onEditPartner: (partner: Partner) => void;
@@ -66,6 +66,8 @@ export default function PartnerTable({
 
   const getNextStatus = (currentStatus: PartnerStatus): PartnerStatus | null => {
     switch (currentStatus) {
+      case 'contacted':
+        return 'lead';
       case 'lead':
         return 'negotiation';
       case 'negotiation':
@@ -77,6 +79,8 @@ export default function PartnerTable({
 
   const getMoveButtonText = (status: PartnerStatus): string => {
     switch (status) {
+      case 'contacted':
+        return 'Move to Leads';
       case 'lead':
         return 'Move to Negotiation';
       case 'negotiation':
@@ -124,14 +128,17 @@ export default function PartnerTable({
     } else {
       const nextStatus = getNextStatus(partner.status);
       if (nextStatus) {
-        await onMove(partner.id, nextStatus);
+        await onMove(partner.id, nextStatus, partner.status);
       }
     }
   };
 
   const getDaysInPipeline = (partner: Partner): number => {
     const endDate = partner.signed_at ? new Date(partner.signed_at) : new Date();
-    return differenceInDays(endDate, new Date(partner.created));
+    // Use lead_date if available (for partners that started in contacted status)
+    // Otherwise use created date
+    const startDate = partner.lead_date ? new Date(partner.lead_date) : new Date(partner.created);
+    return differenceInDays(endDate, startDate);
   };
 
   if (isLoading) {
@@ -454,6 +461,7 @@ export default function PartnerTable({
                             title={getMoveButtonText(partner.status)}
                           >
                             {partner.status === 'signed' ? 'Send to Core' :
+                             partner.status === 'contacted' ? 'To Leads' :
                              partner.status === 'lead' ? 'To Negotiation' : 'To Signed'}
                           </button>
 

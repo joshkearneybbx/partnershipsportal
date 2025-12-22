@@ -67,6 +67,7 @@ const getEmptyFormData = (defaultStatus: PartnerStatus) => ({
   call_had: false,
   contract_sent: false,
   contract_signed: false,
+  lead_date: null as string | null,
   signed_at: null as string | null,
 });
 
@@ -106,6 +107,7 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, onEdit, editPa
           call_had: editPartner.call_had || false,
           contract_sent: editPartner.contract_sent || false,
           contract_signed: editPartner.contract_signed || false,
+          lead_date: editPartner.lead_date || null,
           signed_at: editPartner.signed_at || null,
         });
       } else {
@@ -512,7 +514,7 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, onEdit, editPa
                       {isEditMode ? 'Status' : 'Initial Status'}
                     </label>
                     <div className="flex gap-3">
-                      {(['lead', 'negotiation', 'signed'] as PartnerStatus[]).map((status) => (
+                      {(['contacted', 'lead', 'negotiation', 'signed'] as PartnerStatus[]).map((status) => (
                         <label
                           key={status}
                           className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 cursor-pointer transition-all ${
@@ -531,7 +533,9 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, onEdit, editPa
                           />
                           <span
                             className={`w-3 h-3 rounded-full ${
-                              status === 'lead'
+                              status === 'contacted'
+                                ? 'bg-blue-400'
+                                : status === 'lead'
                                 ? 'bg-blckbx-alert'
                                 : status === 'negotiation'
                                 ? 'bg-blckbx-cta'

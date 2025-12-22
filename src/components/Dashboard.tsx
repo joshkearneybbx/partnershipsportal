@@ -36,7 +36,7 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
   ];
 
   const negotiationData = [
-    { name: 'Contacted', value: weeklyStats.contacted },
+    { name: 'Contacted', value: pipelineStats.contacted },
     { name: 'Call Booked', value: weeklyStats.callsBooked },
     { name: 'Call Had', value: weeklyStats.callsHad },
     { name: 'Contract Sent', value: weeklyStats.contractsSent },
