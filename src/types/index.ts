@@ -30,6 +30,7 @@ export type LifestyleCategory =
 export interface Partner {
   id: string;
   partner_name: string;
+  description: string;
   lifestyle_category: LifestyleCategory;
   contact_name: string;
   contact_position: string;
@@ -53,11 +54,12 @@ export interface Partner {
   when_not_to_use: string;
   sla_notes: string;
 
-  // Negotiation checkboxes
+  // Negotiation checkboxes (only for Direct partnerships)
   contacted: boolean;
   call_booked: boolean;
   call_had: boolean;
   contract_sent: boolean;
+  contract_signed: boolean;
 
   // Timestamps
   created: string;
@@ -73,6 +75,7 @@ export interface WeeklyStats {
   callsBooked: number;
   callsHad: number;
   contractsSent: number;
+  contractsSigned: number;
   avgDaysToSign: number;
 }
 

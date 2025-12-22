@@ -53,10 +53,16 @@ export const createPartner = async (
   partner: Omit<Partner, 'id' | 'created' | 'updated'>
 ): Promise<Partner | null> => {
   try {
+    console.log('[PocketBase] Creating partner with data:', JSON.stringify(partner, null, 2));
     const record = await pb.collection(COLLECTION_NAME).create(partner);
     return record as unknown as Partner;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error creating partner:', error);
+    // Log detailed PocketBase error info
+    if (error && typeof error === 'object' && 'data' in error) {
+      const pbError = error as { data?: { data?: Record<string, unknown> } };
+      console.error('[PocketBase] Error details:', JSON.stringify(pbError.data, null, 2));
+    }
     throw error;
   }
 };
@@ -132,6 +138,7 @@ export const getWeeklyStats = async () => {
       callsBooked: partners.filter((p) => p.call_booked).length,
       callsHad: partners.filter((p) => p.call_had).length,
       contractsSent: partners.filter((p) => p.contract_sent).length,
+      contractsSigned: partners.filter((p) => p.contract_signed).length,
       avgDaysToSign: calculateAvgDaysToSign(
         partners.filter((p) => p.signed_at)
       ),
@@ -146,6 +153,7 @@ export const getWeeklyStats = async () => {
       callsBooked: 0,
       callsHad: 0,
       contractsSent: 0,
+      contractsSigned: 0,
       avgDaysToSign: 0,
     };
   }

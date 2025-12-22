@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Partner, PartnerStatus, OpportunityType, PartnershipType, LifestyleCategory, PartnerTier, UseForTag, LifecycleStage } from '@/types';
 
@@ -8,6 +8,8 @@ interface AddPartnerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAdd: (partner: Omit<Partner, 'id' | 'created' | 'updated'>) => Promise<void>;
+  onEdit?: (id: string, updates: Partial<Partner>) => Promise<void>;
+  editPartner?: Partner | null;
   defaultStatus: PartnerStatus;
 }
 
@@ -39,72 +41,92 @@ const partnerTiers: PartnerTier[] = ['Preferred', 'Standard', 'Test'];
 const useForTags: UseForTag[] = ['Last-minute', 'VIP/HNW', 'Best value', 'International', 'Gifting'];
 const lifecycleStages: LifecycleStage[] = ['New', 'Growing', 'Mature', 'At Risk'];
 
-export default function AddPartnerModal({ isOpen, onClose, onAdd, defaultStatus }: AddPartnerModalProps) {
+const getEmptyFormData = (defaultStatus: PartnerStatus) => ({
+  partner_name: '',
+  description: '',
+  lifestyle_category: 'Misc' as LifestyleCategory,
+  contact_name: '',
+  contact_position: '',
+  contact_phone: '',
+  contact_email: '',
+  opportunity_type: 'Everyday' as OpportunityType,
+  partnership_type: 'Direct' as PartnershipType,
+  partnership_link: '',
+  website: '',
+  login_notes: '',
+  status: defaultStatus,
+  partner_tier: 'Standard' as PartnerTier,
+  use_for_tags: [] as UseForTag[],
+  lifecycle_stage: 'New' as LifecycleStage,
+  is_default: false,
+  partner_brief: '',
+  when_not_to_use: '',
+  sla_notes: '',
+  contacted: false,
+  call_booked: false,
+  call_had: false,
+  contract_sent: false,
+  contract_signed: false,
+  signed_at: null as string | null,
+});
+
+export default function AddPartnerModal({ isOpen, onClose, onAdd, onEdit, editPartner, defaultStatus }: AddPartnerModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
-    partner_name: '',
-    lifestyle_category: 'Misc' as LifestyleCategory,
-    contact_name: '',
-    contact_position: '',
-    contact_phone: '',
-    contact_email: '',
-    opportunity_type: 'Everyday' as OpportunityType,
-    partnership_type: 'Direct' as PartnershipType,
-    partnership_link: '',
-    website: '',
-    login_notes: '',
-    status: defaultStatus,
-    // New classification fields
-    partner_tier: 'Standard' as PartnerTier,
-    use_for_tags: [] as UseForTag[],
-    lifecycle_stage: 'New' as LifecycleStage,
-    is_default: false,
-    // New detail fields
-    partner_brief: '',
-    when_not_to_use: '',
-    sla_notes: '',
-    // Negotiation
-    contacted: false,
-    call_booked: false,
-    call_had: false,
-    contract_sent: false,
-    signed_at: null as string | null,
-  });
+  const [formData, setFormData] = useState(getEmptyFormData(defaultStatus));
+
+  const isEditMode = !!editPartner;
+
+  // Reset form when modal opens/closes or editPartner changes
+  useEffect(() => {
+    if (isOpen) {
+      if (editPartner) {
+        setFormData({
+          partner_name: editPartner.partner_name || '',
+          description: editPartner.description || '',
+          lifestyle_category: editPartner.lifestyle_category || 'Misc',
+          contact_name: editPartner.contact_name || '',
+          contact_position: editPartner.contact_position || '',
+          contact_phone: editPartner.contact_phone || '',
+          contact_email: editPartner.contact_email || '',
+          opportunity_type: editPartner.opportunity_type || 'Everyday',
+          partnership_type: editPartner.partnership_type || 'Direct',
+          partnership_link: editPartner.partnership_link || '',
+          website: editPartner.website || '',
+          login_notes: editPartner.login_notes || '',
+          status: editPartner.status || defaultStatus,
+          partner_tier: editPartner.partner_tier || 'Standard',
+          use_for_tags: editPartner.use_for_tags || [],
+          lifecycle_stage: editPartner.lifecycle_stage || 'New',
+          is_default: editPartner.is_default || false,
+          partner_brief: editPartner.partner_brief || '',
+          when_not_to_use: editPartner.when_not_to_use || '',
+          sla_notes: editPartner.sla_notes || '',
+          contacted: editPartner.contacted || false,
+          call_booked: editPartner.call_booked || false,
+          call_had: editPartner.call_had || false,
+          contract_sent: editPartner.contract_sent || false,
+          contract_signed: editPartner.contract_signed || false,
+          signed_at: editPartner.signed_at || null,
+        });
+      } else {
+        setFormData(getEmptyFormData(defaultStatus));
+      }
+    }
+  }, [isOpen, editPartner, defaultStatus]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
-      await onAdd(formData);
-      setFormData({
-        partner_name: '',
-        lifestyle_category: 'Misc',
-        contact_name: '',
-        contact_position: '',
-        contact_phone: '',
-        contact_email: '',
-        opportunity_type: 'Everyday',
-        partnership_type: 'Direct',
-        partnership_link: '',
-        website: '',
-        login_notes: '',
-        status: defaultStatus,
-        partner_tier: 'Standard',
-        use_for_tags: [],
-        lifecycle_stage: 'New',
-        is_default: false,
-        partner_brief: '',
-        when_not_to_use: '',
-        sla_notes: '',
-        contacted: false,
-        call_booked: false,
-        call_had: false,
-        contract_sent: false,
-        signed_at: null,
-      });
+      if (isEditMode && editPartner && onEdit) {
+        await onEdit(editPartner.id, formData);
+      } else {
+        await onAdd(formData);
+      }
+      onClose();
     } catch (error) {
-      console.error('Error adding partner:', error);
+      console.error('Error saving partner:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -151,8 +173,12 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, defaultStatus 
               {/* Header */}
               <div className="bg-blckbx-black text-blckbx-sand px-6 py-4 flex items-center justify-between">
                 <div>
-                  <h2 className="font-display text-2xl font-semibold">Add New Partner</h2>
-                  <p className="text-blckbx-sand/60 text-sm mt-0.5">Fill in the partner details below</p>
+                  <h2 className="font-display text-2xl font-semibold">
+                    {isEditMode ? 'Edit Partner' : 'Add New Partner'}
+                  </h2>
+                  <p className="text-blckbx-sand/60 text-sm mt-0.5">
+                    {isEditMode ? `Editing ${editPartner?.partner_name}` : 'Fill in the partner details below'}
+                  </p>
                 </div>
                 <button
                   onClick={onClose}
@@ -180,6 +206,21 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, defaultStatus 
                       required
                       className="w-full px-4 py-2.5 border border-blckbx-dark-sand rounded-lg bg-blckbx-sand/30 text-blckbx-black placeholder-blckbx-black/40 focus:border-blckbx-cta"
                       placeholder="e.g., Soho House"
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium text-blckbx-black mb-1">
+                      Description
+                    </label>
+                    <input
+                      type="text"
+                      name="description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2.5 border border-blckbx-dark-sand rounded-lg bg-blckbx-sand/30 text-blckbx-black placeholder-blckbx-black/40 focus:border-blckbx-cta"
+                      placeholder="e.g., Private members club with global locations"
                     />
                   </div>
 
@@ -468,7 +509,7 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, defaultStatus 
                   {/* Status */}
                   <div className="col-span-2">
                     <label className="block text-sm font-medium text-blckbx-black mb-1">
-                      Initial Status
+                      {isEditMode ? 'Status' : 'Initial Status'}
                     </label>
                     <div className="flex gap-3">
                       {(['lead', 'negotiation', 'signed'] as PartnerStatus[]).map((status) => (
@@ -547,14 +588,18 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, defaultStatus 
                     {isSubmitting ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        Adding...
+                        {isEditMode ? 'Saving...' : 'Adding...'}
                       </>
                     ) : (
                       <>
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          {isEditMode ? (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          ) : (
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          )}
                         </svg>
-                        Add Partner
+                        {isEditMode ? 'Save Changes' : 'Add Partner'}
                       </>
                     )}
                   </button>

@@ -31,6 +31,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [editPartner, setEditPartner] = useState<Partner | null>(null);
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStats>({
     newLeads: 0,
     inNegotiation: 0,
@@ -39,6 +40,7 @@ export default function Home() {
     callsBooked: 0,
     callsHad: 0,
     contractsSent: 0,
+    contractsSigned: 0,
     avgDaysToSign: 0,
   });
   const [pipelineStats, setPipelineStats] = useState<PipelineStats>({
@@ -152,6 +154,16 @@ export default function Home() {
     } catch (error) {
       console.error('Error deleting partner:', error);
     }
+  };
+
+  const handleEditPartner = (partner: Partner) => {
+    setEditPartner(partner);
+    setShowAddModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowAddModal(false);
+    setEditPartner(null);
   };
 
   // Show loading state while checking auth
@@ -279,6 +291,7 @@ export default function Home() {
                   onMove={handleMovePartner}
                   onDelete={handleDeletePartner}
                   onSendToCore={handleSendToCore}
+                  onEditPartner={handleEditPartner}
                   isLoading={isLoading}
                 />
               </motion.div>
@@ -287,12 +300,20 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Add Partner Modal */}
+      {/* Add/Edit Partner Modal */}
       <AddPartnerModal
         isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
+        onClose={handleCloseModal}
         onAdd={handleAddPartner}
-        defaultStatus={activeTab === 'all' ? 'lead' : (activeTab as PartnerStatus)}
+        onEdit={handleUpdatePartner}
+        editPartner={editPartner}
+        defaultStatus={
+          activeTab === 'all' || activeTab === 'dashboard' || activeTab === 'partner-health'
+            ? 'lead'
+            : activeTab === 'leads'
+            ? 'lead'
+            : (activeTab as PartnerStatus)
+        }
       />
     </div>
   );
