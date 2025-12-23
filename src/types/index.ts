@@ -53,6 +53,7 @@ export interface Partner {
   partner_brief: string;
   when_not_to_use: string;
   sla_notes: string;
+  commission: string;
 
   // Negotiation checkboxes (only for Direct partnerships)
   contacted: boolean;

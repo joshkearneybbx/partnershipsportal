@@ -62,6 +62,7 @@ const getEmptyFormData = (defaultStatus: PartnerStatus) => ({
   partner_brief: '',
   when_not_to_use: '',
   sla_notes: '',
+  commission: '',
   contacted: false,
   call_booked: false,
   call_had: false,
@@ -102,6 +103,7 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, onEdit, editPa
           partner_brief: editPartner.partner_brief || '',
           when_not_to_use: editPartner.when_not_to_use || '',
           sla_notes: editPartner.sla_notes || '',
+          commission: editPartner.commission || '',
           contacted: editPartner.contacted || false,
           call_booked: editPartner.call_booked || false,
           call_had: editPartner.call_had || false,
@@ -398,6 +400,21 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, onEdit, editPa
                       onChange={handleChange}
                       className="w-full px-4 py-2.5 border border-blckbx-dark-sand rounded-lg bg-blckbx-sand/30 text-blckbx-black placeholder-blckbx-black/40 focus:border-blckbx-cta"
                       placeholder="e.g., 24hr response time"
+                    />
+                  </div>
+
+                  {/* Commission */}
+                  <div>
+                    <label className="block text-sm font-medium text-blckbx-black mb-1">
+                      Commission
+                    </label>
+                    <input
+                      type="text"
+                      name="commission"
+                      value={formData.commission}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2.5 border border-blckbx-dark-sand rounded-lg bg-blckbx-sand/30 text-blckbx-black placeholder-blckbx-black/40 focus:border-blckbx-cta"
+                      placeholder="e.g., 10% or £50 per booking"
                     />
                   </div>
 

@@ -195,7 +195,6 @@ export default function PartnerTable({
                   )}
                 </div>
               </th>
-              <th className="p-4 font-medium text-sm whitespace-nowrap">Description</th>
               <th
                 className="p-4 font-medium text-sm cursor-pointer hover:bg-blckbx-cta/80 transition-colors whitespace-nowrap"
                 onClick={() => handleSort('lifestyle_category')}
@@ -207,6 +206,7 @@ export default function PartnerTable({
                   )}
                 </div>
               </th>
+              <th className="p-4 font-medium text-sm whitespace-nowrap">Commission</th>
               {currentTab === 'all' && (
                 <>
                   <th className="p-4 font-medium text-sm whitespace-nowrap">Contact Name</th>
@@ -278,6 +278,7 @@ export default function PartnerTable({
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                              partner.status === 'contacted' ? 'bg-blue-400' :
                               partner.status === 'lead' ? 'bg-blckbx-alert' :
                               partner.status === 'negotiation' ? 'bg-blckbx-cta' :
                               'bg-green-500'
@@ -296,16 +297,16 @@ export default function PartnerTable({
                           )}
                         </div>
                       </td>
-                      {/* Description */}
-                      <td className="p-3">
-                        <span className="text-sm text-blckbx-black/70 line-clamp-2 max-w-[200px]">
-                          {partner.description || '-'}
-                        </span>
-                      </td>
                       {/* Category */}
                       <td className="p-3">
                         <span className="px-2 py-1 text-xs rounded-full bg-blckbx-dark-sand text-blckbx-black/70 whitespace-nowrap">
                           {partner.lifestyle_category}
+                        </span>
+                      </td>
+                      {/* Commission */}
+                      <td className="p-3">
+                        <span className="text-sm text-blckbx-black/70 whitespace-nowrap">
+                          {partner.commission || '-'}
                         </span>
                       </td>
                       {/* Contact - Split columns for 'all' tab */}
@@ -354,6 +355,7 @@ export default function PartnerTable({
                           {/* Status */}
                           <td className="p-3">
                             <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
+                              partner.status === 'contacted' ? 'bg-blue-100 text-blue-700' :
                               partner.status === 'lead' ? 'bg-blckbx-alert/20 text-orange-700' :
                               partner.status === 'negotiation' ? 'bg-blckbx-cta/20 text-blckbx-cta' :
                               'bg-green-100 text-green-700'
