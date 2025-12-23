@@ -1,17 +1,18 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { 
-  PieChart, 
-  Pie, 
-  Cell, 
-  ResponsiveContainer, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
   Tooltip,
-  Legend 
+  Legend
 } from 'recharts';
 import { WeeklyStats, PipelineStats, Partner } from '@/types';
 import { format, subDays, isAfter } from 'date-fns';
@@ -28,7 +29,16 @@ const COLORS = {
   signed: '#22C55E',
 };
 
+// Colors for lifestyle categories
+const CATEGORY_COLORS = [
+  '#6B1488', '#FFBB95', '#22C55E', '#3B82F6', '#EF4444',
+  '#F59E0B', '#8B5CF6', '#EC4899', '#14B8A6', '#64748B',
+  '#DC2626', '#059669', '#7C3AED', '#DB2777', '#0891B2'
+];
+
 export default function Dashboard({ weeklyStats, pipelineStats, partners }: DashboardProps) {
+  const [expandedStatus, setExpandedStatus] = useState<string | null>(null);
+
   const pieData = [
     { name: 'Leads', value: pipelineStats.leads, color: COLORS.leads },
     { name: 'Negotiation', value: pipelineStats.negotiation, color: COLORS.negotiation },
@@ -41,6 +51,33 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
     { name: 'Call Had', value: weeklyStats.callsHad },
     { name: 'Contract Sent', value: weeklyStats.contractsSent },
   ];
+
+  // Calculate lifestyle categories per status
+  const getCategoryDataByStatus = (status: string) => {
+    const statusPartners = partners.filter(p => p.status === status);
+    const categoryCount: Record<string, number> = {};
+
+    statusPartners.forEach(p => {
+      categoryCount[p.lifestyle_category] = (categoryCount[p.lifestyle_category] || 0) + 1;
+    });
+
+    return Object.entries(categoryCount)
+      .map(([name, value], index) => ({
+        name,
+        value,
+        color: CATEGORY_COLORS[index % CATEGORY_COLORS.length]
+      }))
+      .sort((a, b) => b.value - a.value);
+  };
+
+  const contactedCategoryData = getCategoryDataByStatus('contacted');
+  const leadsCategoryData = getCategoryDataByStatus('lead');
+  const negotiationCategoryData = getCategoryDataByStatus('negotiation');
+  const signedCategoryData = getCategoryDataByStatus('signed');
+
+  const toggleExpand = (status: string) => {
+    setExpandedStatus(expandedStatus === status ? null : status);
+  };
 
   // Get recent activity (last 7 days)
   const sevenDaysAgo = subDays(new Date(), 7);
@@ -249,6 +286,361 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
           </div>
         </motion.div>
       </div>
+
+      {/* Lifestyle Categories by Status */}
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35 }}
+        className="bg-white rounded-2xl p-6 shadow-sm border border-blckbx-dark-sand"
+      >
+        <h3 className="font-display text-xl font-semibold text-blckbx-black mb-6">Lifestyle Categories by Status</h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Contacted Categories */}
+          <div className="border border-blckbx-dark-sand rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-3 h-3 rounded-full bg-blue-400" />
+              <h4 className="font-medium text-blckbx-black">Contacted</h4>
+              <span className="text-sm text-blckbx-black/50">({pipelineStats.contacted})</span>
+            </div>
+            {contactedCategoryData.length === 0 ? (
+              <p className="text-blckbx-black/50 text-center py-8 text-sm">No contacted yet</p>
+            ) : (
+              <>
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={contactedCategoryData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={30}
+                        outerRadius={55}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {contactedCategoryData.map((entry, index) => (
+                          <Cell key={`contacted-cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          background: '#1C1D1F',
+                          border: 'none',
+                          borderRadius: '8px',
+                          color: '#F5F3F0',
+                          fontSize: '12px'
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-3">
+                  <AnimatePresence mode="wait">
+                    {expandedStatus === 'contacted' ? (
+                      <motion.div
+                        key="expanded"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="flex flex-wrap gap-2"
+                      >
+                        {contactedCategoryData.map((item) => (
+                          <div key={item.name} className="flex items-center gap-1.5 text-xs">
+                            <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
+                            <span className="text-blckbx-black/70">{item.name}: {item.value}</span>
+                          </div>
+                        ))}
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="collapsed"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex flex-wrap gap-2"
+                      >
+                        {contactedCategoryData.slice(0, 3).map((item) => (
+                          <div key={item.name} className="flex items-center gap-1.5 text-xs">
+                            <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
+                            <span className="text-blckbx-black/70">{item.name}: {item.value}</span>
+                          </div>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  {contactedCategoryData.length > 3 && (
+                    <button
+                      onClick={() => toggleExpand('contacted')}
+                      className="text-xs text-blckbx-cta hover:underline mt-2"
+                    >
+                      {expandedStatus === 'contacted' ? 'Show less' : `+${contactedCategoryData.length - 3} more`}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Leads Categories */}
+          <div className="border border-blckbx-dark-sand rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-3 h-3 rounded-full bg-blckbx-alert" />
+              <h4 className="font-medium text-blckbx-black">Leads</h4>
+              <span className="text-sm text-blckbx-black/50">({pipelineStats.leads})</span>
+            </div>
+            {leadsCategoryData.length === 0 ? (
+              <p className="text-blckbx-black/50 text-center py-8 text-sm">No leads yet</p>
+            ) : (
+              <>
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={leadsCategoryData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={30}
+                        outerRadius={55}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {leadsCategoryData.map((entry, index) => (
+                          <Cell key={`lead-cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          background: '#1C1D1F',
+                          border: 'none',
+                          borderRadius: '8px',
+                          color: '#F5F3F0',
+                          fontSize: '12px'
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-3">
+                  <AnimatePresence mode="wait">
+                    {expandedStatus === 'lead' ? (
+                      <motion.div
+                        key="expanded"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="flex flex-wrap gap-2"
+                      >
+                        {leadsCategoryData.map((item) => (
+                          <div key={item.name} className="flex items-center gap-1.5 text-xs">
+                            <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
+                            <span className="text-blckbx-black/70">{item.name}: {item.value}</span>
+                          </div>
+                        ))}
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="collapsed"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex flex-wrap gap-2"
+                      >
+                        {leadsCategoryData.slice(0, 3).map((item) => (
+                          <div key={item.name} className="flex items-center gap-1.5 text-xs">
+                            <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
+                            <span className="text-blckbx-black/70">{item.name}: {item.value}</span>
+                          </div>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  {leadsCategoryData.length > 3 && (
+                    <button
+                      onClick={() => toggleExpand('lead')}
+                      className="text-xs text-blckbx-cta hover:underline mt-2"
+                    >
+                      {expandedStatus === 'lead' ? 'Show less' : `+${leadsCategoryData.length - 3} more`}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Negotiation Categories */}
+          <div className="border border-blckbx-dark-sand rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-3 h-3 rounded-full bg-blckbx-cta" />
+              <h4 className="font-medium text-blckbx-black">Negotiation</h4>
+              <span className="text-sm text-blckbx-black/50">({pipelineStats.negotiation})</span>
+            </div>
+            {negotiationCategoryData.length === 0 ? (
+              <p className="text-blckbx-black/50 text-center py-8 text-sm">No partners in negotiation</p>
+            ) : (
+              <>
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={negotiationCategoryData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={30}
+                        outerRadius={55}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {negotiationCategoryData.map((entry, index) => (
+                          <Cell key={`neg-cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          background: '#1C1D1F',
+                          border: 'none',
+                          borderRadius: '8px',
+                          color: '#F5F3F0',
+                          fontSize: '12px'
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-3">
+                  <AnimatePresence mode="wait">
+                    {expandedStatus === 'negotiation' ? (
+                      <motion.div
+                        key="expanded"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="flex flex-wrap gap-2"
+                      >
+                        {negotiationCategoryData.map((item) => (
+                          <div key={item.name} className="flex items-center gap-1.5 text-xs">
+                            <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
+                            <span className="text-blckbx-black/70">{item.name}: {item.value}</span>
+                          </div>
+                        ))}
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="collapsed"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex flex-wrap gap-2"
+                      >
+                        {negotiationCategoryData.slice(0, 3).map((item) => (
+                          <div key={item.name} className="flex items-center gap-1.5 text-xs">
+                            <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
+                            <span className="text-blckbx-black/70">{item.name}: {item.value}</span>
+                          </div>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  {negotiationCategoryData.length > 3 && (
+                    <button
+                      onClick={() => toggleExpand('negotiation')}
+                      className="text-xs text-blckbx-cta hover:underline mt-2"
+                    >
+                      {expandedStatus === 'negotiation' ? 'Show less' : `+${negotiationCategoryData.length - 3} more`}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Signed Categories */}
+          <div className="border border-blckbx-dark-sand rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-3 h-3 rounded-full bg-green-500" />
+              <h4 className="font-medium text-blckbx-black">Signed</h4>
+              <span className="text-sm text-blckbx-black/50">({pipelineStats.signed})</span>
+            </div>
+            {signedCategoryData.length === 0 ? (
+              <p className="text-blckbx-black/50 text-center py-8 text-sm">No signed partners</p>
+            ) : (
+              <>
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={signedCategoryData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={30}
+                        outerRadius={55}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {signedCategoryData.map((entry, index) => (
+                          <Cell key={`signed-cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          background: '#1C1D1F',
+                          border: 'none',
+                          borderRadius: '8px',
+                          color: '#F5F3F0',
+                          fontSize: '12px'
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="mt-3">
+                  <AnimatePresence mode="wait">
+                    {expandedStatus === 'signed' ? (
+                      <motion.div
+                        key="expanded"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="flex flex-wrap gap-2"
+                      >
+                        {signedCategoryData.map((item) => (
+                          <div key={item.name} className="flex items-center gap-1.5 text-xs">
+                            <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
+                            <span className="text-blckbx-black/70">{item.name}: {item.value}</span>
+                          </div>
+                        ))}
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="collapsed"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex flex-wrap gap-2"
+                      >
+                        {signedCategoryData.slice(0, 3).map((item) => (
+                          <div key={item.name} className="flex items-center gap-1.5 text-xs">
+                            <div className="w-2 h-2 rounded-full" style={{ background: item.color }} />
+                            <span className="text-blckbx-black/70">{item.name}: {item.value}</span>
+                          </div>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  {signedCategoryData.length > 3 && (
+                    <button
+                      onClick={() => toggleExpand('signed')}
+                      className="text-xs text-blckbx-cta hover:underline mt-2"
+                    >
+                      {expandedStatus === 'signed' ? 'Show less' : `+${signedCategoryData.length - 3} more`}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </motion.section>
 
       {/* Recent Activity */}
       <motion.section

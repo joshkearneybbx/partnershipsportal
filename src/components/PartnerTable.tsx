@@ -439,23 +439,9 @@ export default function PartnerTable({
                             </svg>
                           </button>
 
-                          {partner.partnership_link && (
-                            <a
-                              href={partner.partnership_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1.5 rounded bg-blckbx-dark-sand text-blckbx-black/70 hover:bg-blckbx-black hover:text-white transition-colors"
-                              title="Partnership link"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                              </svg>
-                            </a>
-                          )}
-
                           <button
                             onClick={() => handleMoveClick(partner)}
-                            className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                            className={`w-24 h-10 rounded text-xs font-medium transition-colors ${
                               partner.status === 'signed'
                                 ? 'bg-green-500 text-white hover:bg-green-600'
                                 : 'bg-blckbx-cta text-white hover:bg-blckbx-cta/80'
