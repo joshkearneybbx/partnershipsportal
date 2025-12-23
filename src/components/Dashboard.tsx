@@ -29,12 +29,47 @@ const COLORS = {
   signed: '#22C55E',
 };
 
-// Colors for lifestyle categories
-const CATEGORY_COLORS = [
-  '#6B1488', '#FFBB95', '#22C55E', '#3B82F6', '#EF4444',
-  '#F59E0B', '#8B5CF6', '#EC4899', '#14B8A6', '#64748B',
-  '#DC2626', '#059669', '#7C3AED', '#DB2777', '#0891B2'
-];
+// Fixed color mapping for lifestyle categories - consistent across all charts
+const CATEGORY_COLOR_MAP: Record<string, string> = {
+  'Travel': '#6B1488',
+  'Hotels': '#FFBB95',
+  'Supermarkets': '#22C55E',
+  'Restaurants': '#3B82F6',
+  'Trades': '#EF4444',
+  'Misc': '#F59E0B',
+  'Childcare': '#8B5CF6',
+  'Kids + Family': '#EC4899',
+  'Services': '#14B8A6',
+  'Eldercare': '#64748B',
+  'Taxis': '#DC2626',
+  'Flowers': '#059669',
+  'Department Store': '#7C3AED',
+  'Affiliates': '#DB2777',
+  'Beauty': '#0891B2',
+  'Retail': '#0D9488',
+  'Jewellery': '#C026D3',
+  'Cars': '#EA580C',
+  'Electronics': '#4F46E5',
+  'Home': '#16A34A',
+  'Health + Fitness': '#E11D48',
+};
+
+// Fallback colors for any new categories
+const FALLBACK_COLORS = ['#6366F1', '#84CC16', '#F97316', '#06B6D4', '#A855F7'];
+
+// Custom tooltip for category pie charts
+const CategoryTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: { color: string } }> }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0];
+    return (
+      <div className="bg-blckbx-black px-3 py-2 rounded-lg shadow-lg">
+        <p className="text-blckbx-sand text-sm font-medium">{data.name}</p>
+        <p className="text-blckbx-sand/70 text-xs">{data.value} partners</p>
+      </div>
+    );
+  }
+  return null;
+};
 
 export default function Dashboard({ weeklyStats, pipelineStats, partners }: DashboardProps) {
   const [expandedStatus, setExpandedStatus] = useState<string | null>(null);
@@ -61,12 +96,16 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
       categoryCount[p.lifestyle_category] = (categoryCount[p.lifestyle_category] || 0) + 1;
     });
 
+    let fallbackIndex = 0;
     return Object.entries(categoryCount)
-      .map(([name, value], index) => ({
-        name,
-        value,
-        color: CATEGORY_COLORS[index % CATEGORY_COLORS.length]
-      }))
+      .map(([name, value]) => {
+        let color = CATEGORY_COLOR_MAP[name];
+        if (!color) {
+          color = FALLBACK_COLORS[fallbackIndex % FALLBACK_COLORS.length];
+          fallbackIndex++;
+        }
+        return { name, value, color };
+      })
       .sort((a, b) => b.value - a.value);
   };
 
@@ -228,13 +267,15 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    background: '#1C1D1F', 
-                    border: 'none', 
+                <Tooltip
+                  contentStyle={{
+                    background: '#1C1D1F',
+                    border: 'none',
                     borderRadius: '8px',
                     color: '#F5F3F0'
                   }}
+                  itemStyle={{ color: '#F5F3F0' }}
+                  labelStyle={{ color: '#F5F3F0' }}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -267,13 +308,16 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
                   tick={{ fill: '#1C1D1F', fontSize: 12 }}
                   width={100}
                 />
-                <Tooltip 
-                  contentStyle={{ 
-                    background: '#1C1D1F', 
-                    border: 'none', 
+                <Tooltip
+                  contentStyle={{
+                    background: '#1C1D1F',
+                    border: 'none',
                     borderRadius: '8px',
                     color: '#F5F3F0'
                   }}
+                  itemStyle={{ color: '#F5F3F0' }}
+                  labelStyle={{ color: '#F5F3F0' }}
+                  cursor={{ fill: 'rgba(107, 20, 136, 0.1)' }}
                 />
                 <Bar 
                   dataKey="value" 
@@ -318,20 +362,13 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
                         outerRadius={55}
                         paddingAngle={2}
                         dataKey="value"
+                        nameKey="name"
                       >
                         {contactedCategoryData.map((entry, index) => (
                           <Cell key={`contacted-cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          background: '#1C1D1F',
-                          border: 'none',
-                          borderRadius: '8px',
-                          color: '#F5F3F0',
-                          fontSize: '12px'
-                        }}
-                      />
+                      <Tooltip content={<CategoryTooltip />} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -404,20 +441,13 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
                         outerRadius={55}
                         paddingAngle={2}
                         dataKey="value"
+                        nameKey="name"
                       >
                         {leadsCategoryData.map((entry, index) => (
                           <Cell key={`lead-cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          background: '#1C1D1F',
-                          border: 'none',
-                          borderRadius: '8px',
-                          color: '#F5F3F0',
-                          fontSize: '12px'
-                        }}
-                      />
+                      <Tooltip content={<CategoryTooltip />} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -490,20 +520,13 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
                         outerRadius={55}
                         paddingAngle={2}
                         dataKey="value"
+                        nameKey="name"
                       >
                         {negotiationCategoryData.map((entry, index) => (
                           <Cell key={`neg-cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          background: '#1C1D1F',
-                          border: 'none',
-                          borderRadius: '8px',
-                          color: '#F5F3F0',
-                          fontSize: '12px'
-                        }}
-                      />
+                      <Tooltip content={<CategoryTooltip />} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -576,20 +599,13 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
                         outerRadius={55}
                         paddingAngle={2}
                         dataKey="value"
+                        nameKey="name"
                       >
                         {signedCategoryData.map((entry, index) => (
                           <Cell key={`signed-cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          background: '#1C1D1F',
-                          border: 'none',
-                          borderRadius: '8px',
-                          color: '#F5F3F0',
-                          fontSize: '12px'
-                        }}
-                      />
+                      <Tooltip content={<CategoryTooltip />} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
