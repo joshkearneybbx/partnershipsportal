@@ -31,6 +31,7 @@ const COLORS = {
 
 // Fixed color mapping for lifestyle categories - consistent across all charts
 const CATEGORY_COLOR_MAP: Record<string, string> = {
+  'Airline': '#0369A1',
   'Travel': '#6B1488',
   'Hotels': '#FFBB95',
   'Supermarkets': '#22C55E',

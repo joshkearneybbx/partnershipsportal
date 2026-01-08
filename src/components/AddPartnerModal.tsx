@@ -15,6 +15,7 @@ interface AddPartnerModalProps {
 
 const lifestyleCategories: LifestyleCategory[] = [
   'Travel',
+  'Airline',
   'Hotels',
   'Supermarkets',
   'Restaurants',

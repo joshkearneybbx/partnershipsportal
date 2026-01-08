@@ -6,6 +6,7 @@ export type UseForTag = 'Last-minute' | 'VIP/HNW' | 'Best value' | 'Internationa
 export type LifecycleStage = 'New' | 'Growing' | 'Mature' | 'At Risk';
 export type LifestyleCategory =
   | 'Travel'
+  | 'Airline'
   | 'Hotels'
   | 'Supermarkets'
   | 'Restaurants'
