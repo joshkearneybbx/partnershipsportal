@@ -36,6 +36,8 @@ const lifestyleCategories: LifestyleCategory[] = [
   'Electronics',
   'Home',
   'Health + Fitness',
+  'Events',
+  'Wellness',
 ];
 
 const partnerTiers: PartnerTier[] = ['Preferred', 'Standard', 'Test'];

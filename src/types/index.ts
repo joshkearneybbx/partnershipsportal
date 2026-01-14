@@ -26,7 +26,9 @@ export type LifestyleCategory =
   | 'Cars'
   | 'Electronics'
   | 'Home'
-  | 'Health + Fitness';
+  | 'Health + Fitness'
+  | 'Events'
+  | 'Wellness';
 
 export interface Partner {
   id: string;
