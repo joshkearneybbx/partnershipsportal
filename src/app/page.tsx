@@ -8,6 +8,7 @@ import Sidebar from '@/components/Sidebar';
 import AddPartnerModal from '@/components/AddPartnerModal';
 import LoginPage from '@/components/LoginPage';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 import { Partner, PartnerStatus, WeeklyStats, PipelineStats } from '@/types';
 import {
   getPartners,
@@ -19,12 +20,13 @@ import {
   getWeeklyStats,
   getPipelineStats,
 } from '@/lib/pocketbase';
-import { sendToCore } from '@/lib/webhook';
+import { sendToCore, sendToBrevo } from '@/lib/webhook';
 
-type TabType = 'dashboard' | 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all' | 'partner-health';
+type TabType = 'dashboard' | 'potential' | 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all' | 'partner-health';
 
 export default function Home() {
   const { user, isLoading: authLoading } = useAuth();
+  const { showSuccess, showError } = useToast();
   const [activeTab, setActiveTab] = useState<TabType>('dashboard');
   const [partners, setPartners] = useState<Partner[]>([]);
   const [filteredPartners, setFilteredPartners] = useState<Partner[]>([]);
@@ -37,6 +39,7 @@ export default function Home() {
     inNegotiation: 0,
     signed: 0,
     contacted: 0,
+    potential: 0,
     callsBooked: 0,
     callsHad: 0,
     contractsSent: 0,
@@ -44,6 +47,7 @@ export default function Home() {
     avgDaysToSign: 0,
   });
   const [pipelineStats, setPipelineStats] = useState<PipelineStats>({
+    potential: 0,
     contacted: 0,
     leads: 0,
     negotiation: 0,
@@ -58,6 +62,7 @@ export default function Home() {
     } else {
       // Map tab names to status values (tabs are plural, statuses are singular)
       const statusMap: Record<string, string> = {
+        'potential': 'potential',
         'contacted': 'contacted',
         'leads': 'lead',
         'negotiation': 'negotiation',
@@ -141,9 +146,18 @@ export default function Home() {
   const handleSendToCore = async (partner: Partner) => {
     const result = await sendToCore(partner);
     if (result.success) {
-      alert(`Successfully sent ${partner.partner_name} to Core!`);
+      showSuccess(`Successfully sent ${partner.partner_name} to Core!`);
     } else {
-      alert(`Failed to send to Core: ${result.error || 'Unknown error'}`);
+      showError(`Failed to send to Core: ${result.error || 'Unknown error'}`);
+    }
+  };
+
+  const handleSendToBrevo = async (partner: Partner) => {
+    const result = await sendToBrevo(partner);
+    if (result.success) {
+      showSuccess(`Successfully sent ${partner.partner_name} to Brevo!`);
+    } else {
+      showError(`Failed to send to Brevo: ${result.error || 'Unknown error'}`);
     }
   };
 
@@ -210,6 +224,8 @@ export default function Home() {
               >
                 {activeTab === 'dashboard'
                   ? 'Dashboard'
+                  : activeTab === 'potential'
+                  ? 'Potential Leads'
                   : activeTab === 'contacted'
                   ? 'Contacted'
                   : activeTab === 'leads'
@@ -295,6 +311,7 @@ export default function Home() {
                   onMove={handleMovePartner}
                   onDelete={handleDeletePartner}
                   onSendToCore={handleSendToCore}
+                  onSendToBrevo={handleSendToBrevo}
                   onEditPartner={handleEditPartner}
                   isLoading={isLoading}
                 />
@@ -313,7 +330,7 @@ export default function Home() {
         editPartner={editPartner}
         defaultStatus={
           activeTab === 'all' || activeTab === 'dashboard' || activeTab === 'partner-health'
-            ? 'lead'
+            ? 'potential'
             : activeTab === 'leads'
             ? 'lead'
             : (activeTab as PartnerStatus)

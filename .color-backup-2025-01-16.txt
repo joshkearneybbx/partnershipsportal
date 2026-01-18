@@ -1,0 +1,47 @@
+# BlckBx Color Scheme Backup
+# Date: 2025-01-16
+# This file contains the previous color scheme before the update
+
+## tailwind.config.js - Previous Colors
+
+colors: {
+  'blckbx': {
+    'black': '#1C1D1F',     // Changed to: #1D1C1B
+    'sand': '#F5F3F0',      // Unchanged
+    'dark-sand': '#E8E5E0', // Unchanged
+    'cta': '#6B1488',       // Changed to: #E6B148 (was purple)
+    'alert': '#FFBB95',     // Changed to: #E23737 (was light orange)
+  }
+}
+
+## globals.css - Previous CSS Variables
+
+:root {
+  --blckbx-black: #1C1D1F;     // Changed to: #1D1C1B
+  --blckbx-sand: #F5F3F0;      // Unchanged
+  --blckbx-dark-sand: #E8E5E0; // Unchanged
+  --blckbx-cta: #6B1488;       // Changed to: #E6B148 (was purple)
+  --blckbx-alert: #FFBB95;     // Changed to: #E23737 (was light orange)
+}
+
+## To Revert (if needed)
+
+### 1. Update tailwind.config.js colors section to:
+colors: {
+  'blckbx': {
+    'black': '#1C1D1F',
+    'sand': '#F5F3F0',
+    'dark-sand': '#E8E5E0',
+    'cta': '#6B1488',
+    'alert': '#FFBB95',
+  }
+}
+
+### 2. Update src/app/globals.css :root to:
+:root {
+  --blckbx-black: #1C1D1F;
+  --blckbx-sand: #F5F3F0;
+  --blckbx-dark-sand: #E8E5E0;
+  --blckbx-cta: #6B1488;
+  --blckbx-alert: #FFBB95;
+}

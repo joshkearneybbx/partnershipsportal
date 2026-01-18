@@ -141,6 +141,7 @@ export const getWeeklyStats = async () => {
           new Date(p.signed_at) >= oneWeekAgo
       ).length,
       contacted: partners.filter((p) => p.contacted).length,
+      potential: partners.filter((p) => p.status === 'potential').length,
       callsBooked: partners.filter((p) => p.call_booked).length,
       callsHad: partners.filter((p) => p.call_had).length,
       contractsSent: partners.filter((p) => p.contract_sent).length,
@@ -156,6 +157,7 @@ export const getWeeklyStats = async () => {
       inNegotiation: 0,
       signed: 0,
       contacted: 0,
+      potential: 0,
       callsBooked: 0,
       callsHad: 0,
       contractsSent: 0,
@@ -188,21 +190,23 @@ export const getPipelineStats = async () => {
     const records = await pb.collection(COLLECTION_NAME).getFullList();
     const partners = records as unknown as Partner[];
 
+    const potential = partners.filter((p) => p.status === 'potential').length;
     const contacted = partners.filter((p) => p.status === 'contacted').length;
     const leads = partners.filter((p) => p.status === 'lead').length;
     const negotiation = partners.filter((p) => p.status === 'negotiation').length;
     const signed = partners.filter((p) => p.status === 'signed').length;
 
     return {
+      potential,
       contacted,
       leads,
       negotiation,
       signed,
-      total: leads + negotiation + signed, // Exclude contacted from pipeline total
+      total: potential + contacted + leads + negotiation + signed,
     };
   } catch (error) {
     console.error('Error fetching pipeline stats:', error);
-    return { contacted: 0, leads: 0, negotiation: 0, signed: 0, total: 0 };
+    return { potential: 0, contacted: 0, leads: 0, negotiation: 0, signed: 0, total: 0 };
   }
 };
 

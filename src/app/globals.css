@@ -7,11 +7,20 @@
 :root {
   --font-display: 'Cormorant Garamond', serif;
   --font-body: 'DM Sans', sans-serif;
-  --blckbx-black: #1C1D1F;
+  --blckbx-black: #1D1C1B;
   --blckbx-sand: #F5F3F0;
   --blckbx-dark-sand: #E8E5E0;
-  --blckbx-cta: #6B1488;
-  --blckbx-alert: #FFBB95;
+  --blckbx-sand-900: #2D2C29;
+  --blckbx-cta: #E6B148;
+  --blckbx-alert: #E23737;
+  /* New state colors */
+  --blckbx-success: #1EA988;
+  --blckbx-success-light: #58BEA6;
+  --blckbx-warning: #F4A858;
+  --blckbx-warning-light: #FFBB95;
+  --blckbx-warning-dark: #E9722F;
+  --blckbx-error: #E23737;
+  --blckbx-mint: #C0BDBD;
 }
 
 * {
@@ -159,7 +168,7 @@ textarea:focus {
 
 .stat-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(107, 20, 136, 0.15);
+  box-shadow: 0 8px 30px rgba(230, 177, 72, 0.25);
 }
 
 /* Navigation pill active state */

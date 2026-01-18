@@ -1,4 +1,4 @@
-export type PartnerStatus = 'contacted' | 'lead' | 'negotiation' | 'signed';
+export type PartnerStatus = 'potential' | 'contacted' | 'lead' | 'negotiation' | 'signed';
 export type OpportunityType = 'Big Ticket' | 'Everyday' | 'Low Hanging';
 export type PartnershipType = 'Direct' | 'Affiliate';
 export type PartnerTier = 'Preferred' | 'Standard' | 'Test';
@@ -77,6 +77,7 @@ export interface WeeklyStats {
   inNegotiation: number;
   signed: number;
   contacted: number;
+  potential: number;
   callsBooked: number;
   callsHad: number;
   contractsSent: number;
@@ -85,11 +86,12 @@ export interface WeeklyStats {
 }
 
 export interface PipelineStats {
+  potential: number;
   contacted: number;
   leads: number;
   negotiation: number;
   signed: number;
-  total: number; // Does NOT include contacted - only leads, negotiation, signed
+  total: number;
 }
 
 export interface AuthUser {

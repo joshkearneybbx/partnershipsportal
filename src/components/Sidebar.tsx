@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { PipelineStats } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 
-type TabType = 'dashboard' | 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all' | 'partner-health';
+type TabType = 'dashboard' | 'potential' | 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all' | 'partner-health';
 
 interface SidebarProps {
   activeTab: TabType;
@@ -21,6 +21,15 @@ const navItems: { id: TabType; label: string; icon: JSX.Element }[] = [
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'potential',
+    label: 'Potential Leads',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
       </svg>
     ),
   },
@@ -96,6 +105,8 @@ export default function Sidebar({ activeTab, setActiveTab, pipelineStats, onExpa
 
   const getCount = (id: TabType): number | undefined => {
     switch (id) {
+      case 'potential':
+        return pipelineStats.potential;
       case 'contacted':
         return pipelineStats.contacted;
       case 'leads':
@@ -105,7 +116,7 @@ export default function Sidebar({ activeTab, setActiveTab, pipelineStats, onExpa
       case 'signed':
         return pipelineStats.signed;
       case 'all':
-        return pipelineStats.total + pipelineStats.contacted; // Show all partners including contacted
+        return pipelineStats.total; // Show all partners including potential
       default:
         return undefined;
     }

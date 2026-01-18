@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useToast } from '@/contexts/ToastContext';
 import { Partner, PartnerStatus, OpportunityType, PartnershipType, LifestyleCategory, PartnerTier, UseForTag, LifecycleStage } from '@/types';
 
 interface AddPartnerModalProps {
@@ -76,6 +77,7 @@ const getEmptyFormData = (defaultStatus: PartnerStatus) => ({
 });
 
 export default function AddPartnerModal({ isOpen, onClose, onAdd, onEdit, editPartner, defaultStatus }: AddPartnerModalProps) {
+  const { showSuccess, showError } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState(getEmptyFormData(defaultStatus));
 
@@ -128,12 +130,15 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, onEdit, editPa
     try {
       if (isEditMode && editPartner && onEdit) {
         await onEdit(editPartner.id, formData);
+        showSuccess(`Partner "${formData.partner_name}" updated successfully`);
       } else {
         await onAdd(formData);
+        showSuccess(`Partner "${formData.partner_name}" added successfully`);
       }
       onClose();
     } catch (error) {
       console.error('Error saving partner:', error);
+      showError(isEditMode ? 'Failed to update partner. Please try again.' : 'Failed to add partner. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -534,7 +539,7 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, onEdit, editPa
                       {isEditMode ? 'Status' : 'Initial Status'}
                     </label>
                     <div className="flex gap-3">
-                      {(['contacted', 'lead', 'negotiation', 'signed'] as PartnerStatus[]).map((status) => (
+                      {(['potential', 'contacted', 'lead', 'negotiation', 'signed'] as PartnerStatus[]).map((status) => (
                         <label
                           key={status}
                           className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 cursor-pointer transition-all ${
@@ -553,7 +558,9 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, onEdit, editPa
                           />
                           <span
                             className={`w-3 h-3 rounded-full ${
-                              status === 'contacted'
+                              status === 'potential'
+                                ? 'bg-yellow-400'
+                                : status === 'contacted'
                                 ? 'bg-blue-400'
                                 : status === 'lead'
                                 ? 'bg-blckbx-alert'

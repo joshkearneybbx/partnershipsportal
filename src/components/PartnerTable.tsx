@@ -7,11 +7,12 @@ import { format, differenceInDays } from 'date-fns';
 
 interface PartnerTableProps {
   partners: Partner[];
-  currentTab: 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all';
+  currentTab: 'potential' | 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all';
   onUpdate: (id: string, updates: Partial<Partner>) => Promise<void>;
   onMove: (id: string, newStatus: PartnerStatus, currentStatus?: PartnerStatus) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onSendToCore: (partner: Partner) => Promise<void>;
+  onSendToBrevo: (partner: Partner) => Promise<void>;
   onEditPartner: (partner: Partner) => void;
   isLoading: boolean;
 }
@@ -26,6 +27,7 @@ export default function PartnerTable({
   onMove,
   onDelete,
   onSendToCore,
+  onSendToBrevo,
   onEditPartner,
   isLoading,
 }: PartnerTableProps) {
@@ -66,6 +68,8 @@ export default function PartnerTable({
 
   const getNextStatus = (currentStatus: PartnerStatus): PartnerStatus | null => {
     switch (currentStatus) {
+      case 'potential':
+        return 'contacted';
       case 'contacted':
         return 'lead';
       case 'lead':
@@ -79,6 +83,8 @@ export default function PartnerTable({
 
   const getMoveButtonText = (status: PartnerStatus): string => {
     switch (status) {
+      case 'potential':
+        return 'Move to Contacted';
       case 'contacted':
         return 'Move to Leads';
       case 'lead':
@@ -278,6 +284,7 @@ export default function PartnerTable({
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center gap-2">
                             <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                              partner.status === 'potential' ? 'bg-yellow-400' :
                               partner.status === 'contacted' ? 'bg-blue-400' :
                               partner.status === 'lead' ? 'bg-blckbx-alert' :
                               partner.status === 'negotiation' ? 'bg-blckbx-cta' :
@@ -355,6 +362,7 @@ export default function PartnerTable({
                           {/* Status */}
                           <td className="p-3">
                             <span className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
+                              partner.status === 'potential' ? 'bg-yellow-100 text-yellow-700' :
                               partner.status === 'contacted' ? 'bg-blue-100 text-blue-700' :
                               partner.status === 'lead' ? 'bg-blckbx-alert/20 text-orange-700' :
                               partner.status === 'negotiation' ? 'bg-blckbx-cta/20 text-blckbx-cta' :
@@ -444,14 +452,34 @@ export default function PartnerTable({
                             className={`w-24 h-10 rounded text-xs font-medium transition-colors ${
                               partner.status === 'signed'
                                 ? 'bg-green-500 text-white hover:bg-green-600'
-                                : 'bg-blckbx-cta text-white hover:bg-blckbx-cta/80'
+                                : partner.status === 'potential'
+                                ? 'bg-blue-500 text-white hover:bg-blue-600'
+                                : partner.status === 'contacted'
+                                ? 'bg-purple-500 text-white hover:bg-purple-600'
+                                : partner.status === 'lead'
+                                ? 'bg-orange-500 text-white hover:bg-orange-600'
+                                : 'bg-green-500 text-white hover:bg-green-600'
                             }`}
                             title={getMoveButtonText(partner.status)}
                           >
                             {partner.status === 'signed' ? 'Send to Core' :
+                             partner.status === 'potential' ? 'To Contacted' :
                              partner.status === 'contacted' ? 'To Leads' :
                              partner.status === 'lead' ? 'To Negotiation' : 'To Signed'}
                           </button>
+
+                          {partner.status === 'signed' && (
+                            <button
+                              onClick={() => onSendToBrevo(partner)}
+                              className="p-1.5 rounded bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
+                              title="Send to Brevo"
+                            >
+                              <svg className="w-6 h-6" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="12" fill="#0B996E"/>
+                                <text x="12" y="17" textAnchor="middle" fontSize="14" fontWeight="bold" fill="white" fontFamily="sans-serif">B</text>
+                              </svg>
+                            </button>
+                          )}
 
                           <button
                             onClick={() => onDelete(partner.id)}
