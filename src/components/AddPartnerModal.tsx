@@ -40,6 +40,7 @@ const lifestyleCategories: LifestyleCategory[] = [
   'Events',
   'Wellness',
   'Ski',
+  'Experiences',
 ];
 
 const partnerTiers: PartnerTier[] = ['Preferred', 'Standard', 'Test'];

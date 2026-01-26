@@ -29,7 +29,8 @@ export type LifestyleCategory =
   | 'Health + Fitness'
   | 'Events'
   | 'Wellness'
-  | 'Ski';
+  | 'Ski'
+  | 'Experiences';
 
 export interface Partner {
   id: string;
