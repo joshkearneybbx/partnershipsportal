@@ -197,6 +197,7 @@ export const getPipelineStats = async () => {
     const signed = partners.filter((p) => p.status === 'signed').length;
 
     return {
+      closed: 0,
       potential,
       contacted,
       leads,
@@ -206,7 +207,7 @@ export const getPipelineStats = async () => {
     };
   } catch (error) {
     console.error('Error fetching pipeline stats:', error);
-    return { potential: 0, contacted: 0, leads: 0, negotiation: 0, signed: 0, total: 0 };
+    return { closed: 0, potential: 0, contacted: 0, leads: 0, negotiation: 0, signed: 0, total: 0 };
   }
 };
 

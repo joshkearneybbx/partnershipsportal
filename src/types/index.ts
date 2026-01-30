@@ -1,4 +1,4 @@
-export type PartnerStatus = 'potential' | 'contacted' | 'lead' | 'negotiation' | 'signed';
+export type PartnerStatus = 'closed' | 'potential' | 'contacted' | 'lead' | 'negotiation' | 'signed';
 export type OpportunityType = 'Big Ticket' | 'Everyday' | 'Low Hanging';
 export type PartnershipType = 'Direct' | 'Affiliate';
 export type PartnerTier = 'Preferred' | 'Standard' | 'Test';
@@ -30,7 +30,8 @@ export type LifestyleCategory =
   | 'Events'
   | 'Wellness'
   | 'Ski'
-  | 'Experiences';
+  | 'Experiences'
+  | "Children's Parties and Events";
 
 export interface Partner {
   id: string;
@@ -88,6 +89,7 @@ export interface WeeklyStats {
 }
 
 export interface PipelineStats {
+  closed: number;
   potential: number;
   contacted: number;
   leads: number;

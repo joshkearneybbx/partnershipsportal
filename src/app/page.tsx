@@ -22,7 +22,7 @@ import {
 } from '@/lib/pocketbase';
 import { sendToCore, sendToBrevo } from '@/lib/webhook';
 
-type TabType = 'dashboard' | 'potential' | 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all' | 'partner-health';
+type TabType = 'dashboard' | 'closed' | 'potential' | 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all' | 'partner-health';
 
 export default function Home() {
   const { user, isLoading: authLoading } = useAuth();
@@ -47,6 +47,7 @@ export default function Home() {
     avgDaysToSign: 0,
   });
   const [pipelineStats, setPipelineStats] = useState<PipelineStats>({
+    closed: 0,
     potential: 0,
     contacted: 0,
     leads: 0,
@@ -62,6 +63,7 @@ export default function Home() {
     } else {
       // Map tab names to status values (tabs are plural, statuses are singular)
       const statusMap: Record<string, string> = {
+        'closed': 'closed',
         'potential': 'potential',
         'contacted': 'contacted',
         'leads': 'lead',

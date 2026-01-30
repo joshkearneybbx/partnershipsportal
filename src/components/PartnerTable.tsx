@@ -7,7 +7,7 @@ import { format, differenceInDays } from 'date-fns';
 
 interface PartnerTableProps {
   partners: Partner[];
-  currentTab: 'potential' | 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all';
+  currentTab: 'closed' | 'potential' | 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all';
   onUpdate: (id: string, updates: Partial<Partner>) => Promise<void>;
   onMove: (id: string, newStatus: PartnerStatus, currentStatus?: PartnerStatus) => Promise<void>;
   onDelete: (id: string) => Promise<void>;

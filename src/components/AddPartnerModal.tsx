@@ -41,6 +41,7 @@ const lifestyleCategories: LifestyleCategory[] = [
   'Wellness',
   'Ski',
   'Experiences',
+  "Children's Parties and Events",
 ];
 
 const partnerTiers: PartnerTier[] = ['Preferred', 'Standard', 'Test'];
@@ -541,7 +542,7 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, onEdit, editPa
                       {isEditMode ? 'Status' : 'Initial Status'}
                     </label>
                     <div className="flex gap-3">
-                      {(['potential', 'contacted', 'lead', 'negotiation', 'signed'] as PartnerStatus[]).map((status) => (
+                      {(['closed', 'potential', 'contacted', 'lead', 'negotiation', 'signed'] as PartnerStatus[]).map((status) => (
                         <label
                           key={status}
                           className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 cursor-pointer transition-all ${

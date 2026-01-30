@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { PipelineStats } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 
-type TabType = 'dashboard' | 'potential' | 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all' | 'partner-health';
+type TabType = 'dashboard' | 'closed' | 'potential' | 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all' | 'partner-health';
 
 interface SidebarProps {
   activeTab: TabType;
@@ -21,6 +21,15 @@ const navItems: { id: TabType; label: string; icon: JSX.Element }[] = [
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'closed',
+    label: 'Closed',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
       </svg>
     ),
   },
@@ -105,6 +114,8 @@ export default function Sidebar({ activeTab, setActiveTab, pipelineStats, onExpa
 
   const getCount = (id: TabType): number | undefined => {
     switch (id) {
+      case 'closed':
+        return pipelineStats.closed;
       case 'potential':
         return pipelineStats.potential;
       case 'contacted':

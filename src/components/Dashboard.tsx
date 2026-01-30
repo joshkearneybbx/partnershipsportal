@@ -24,6 +24,7 @@ interface DashboardProps {
 }
 
 const COLORS = {
+  closed: '#9CA3AF',
   potential: '#FACC15',
   contacted: '#3B82F6',
   leads: '#8B5CF6',
@@ -55,6 +56,7 @@ const CATEGORY_COLOR_MAP: Record<string, string> = {
   'Electronics': '#4F46E5',
   'Home': '#16A34A',
   'Health + Fitness': '#E11D48',
+  "Children's Parties and Events": '#FB7185',
 };
 
 // Fallback colors for any new categories
@@ -78,6 +80,7 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
   const [expandedStatus, setExpandedStatus] = useState<string | null>(null);
 
   const pieData = [
+    { name: 'Closed', value: pipelineStats.closed, color: COLORS.closed },
     { name: 'Potential', value: pipelineStats.potential, color: COLORS.potential },
     { name: 'Contacted', value: pipelineStats.contacted, color: COLORS.contacted },
     { name: 'Leads', value: pipelineStats.leads, color: COLORS.leads },
