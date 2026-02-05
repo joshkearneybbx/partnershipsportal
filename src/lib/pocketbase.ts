@@ -29,6 +29,18 @@ export const getPartners = async (): Promise<Partner[]> => {
       sort: '-created',
     });
     console.log('[PocketBase] getPartners success, count:', records.length);
+    
+    // DEBUG: Log stripe_aliases structure for first few partners
+    console.log('[PocketBase] DEBUG: First 5 partners stripe_aliases:');
+    records.slice(0, 5).forEach((r: unknown, i: number) => {
+      const record = r as { partner_name?: string; stripe_aliases?: unknown };
+      console.log(`  [${i}] ${record.partner_name}:`, JSON.stringify({
+        value: record.stripe_aliases,
+        type: typeof record.stripe_aliases,
+        isArray: Array.isArray(record.stripe_aliases),
+      }));
+    });
+    
     return records as unknown as Partner[];
   } catch (error) {
     console.error('[PocketBase] Error fetching partners:', error);

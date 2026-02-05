@@ -68,6 +68,9 @@ export interface Partner {
   contract_sent: boolean;
   contract_signed: boolean;
 
+  // Stripe integration
+  stripe_aliases: string[];
+
   // Timestamps
   created: string;
   updated: string;

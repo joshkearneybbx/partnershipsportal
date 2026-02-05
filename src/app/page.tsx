@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Dashboard from '@/components/Dashboard';
 import PartnerTable from '@/components/PartnerTable';
+import PartnerHealth from '@/components/PartnerHealth';
 import Sidebar from '@/components/Sidebar';
 import AddPartnerModal from '@/components/AddPartnerModal';
 import LoginPage from '@/components/LoginPage';
@@ -297,7 +298,9 @@ export default function Home() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
-              ></motion.div>
+              >
+                <PartnerHealth partners={partners} />
+              </motion.div>
             ) : (
               <motion.div
                 key={activeTab}
