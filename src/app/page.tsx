@@ -35,6 +35,7 @@ export default function Home() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [editPartner, setEditPartner] = useState<Partner | null>(null);
+  const [brevoSuccessModal, setBrevoSuccessModal] = useState<{ show: boolean; partnerName: string }>({ show: false, partnerName: '' });
   const [weeklyStats, setWeeklyStats] = useState<WeeklyStats>({
     newLeads: 0,
     inNegotiation: 0,
@@ -158,7 +159,7 @@ export default function Home() {
   const handleSendToBrevo = async (partner: Partner) => {
     const result = await sendToBrevo(partner);
     if (result.success) {
-      showSuccess(`Successfully sent ${partner.partner_name} to Brevo!`);
+      setBrevoSuccessModal({ show: true, partnerName: partner.partner_name });
     } else {
       showError(`Failed to send to Brevo: ${result.error || 'Unknown error'}`);
     }
@@ -341,6 +342,43 @@ export default function Home() {
             : (activeTab as PartnerStatus)
         }
       />
+
+      {/* Brevo Success Modal */}
+      <AnimatePresence>
+        {brevoSuccessModal.show && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+            onClick={() => setBrevoSuccessModal({ show: false, partnerName: '' })}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 text-center shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Successfully Sent!</h3>
+              <p className="text-gray-600 mb-6">
+                <span className="font-medium text-gray-900">{brevoSuccessModal.partnerName}</span> has been sent to Brevo.
+              </p>
+              <button
+                onClick={() => setBrevoSuccessModal({ show: false, partnerName: '' })}
+                className="w-full py-3 bg-blckbx-cta text-blckbx-black font-medium rounded-xl hover:bg-opacity-90 transition-colors"
+              >
+                Got it
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
