@@ -1,26 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+const BREVO_WEBHOOK_URL = 'https://n8n.blckbx.co.uk/webhook/sendtobrevo';
+
 export async function POST(request: NextRequest) {
   console.log('[API/Brevo] Received request');
 
   try {
     const payload = await request.json();
-    const webhookUrl = process.env.BREVO_WEBHOOK_URL;
 
     console.log('[API/Brevo] Partner:', payload.partner?.partner_name || 'unknown');
-    console.log('[API/Brevo] Target URL:', webhookUrl ? 'configured' : 'MISSING');
-
-    if (!webhookUrl) {
-      console.error('[API/Brevo] BREVO_WEBHOOK_URL environment variable not set');
-      return NextResponse.json(
-        { success: false, error: 'Brevo Webhook URL not configured. Set BREVO_WEBHOOK_URL in environment variables.' },
-        { status: 400 }
-      );
-    }
+    console.log('[API/Brevo] Target URL:', BREVO_WEBHOOK_URL);
 
     console.log('[API/Brevo] Forwarding to Brevo...');
 
-    const response = await fetch(webhookUrl, {
+    const response = await fetch(BREVO_WEBHOOK_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
