@@ -975,6 +975,7 @@ export async function createPartnerFromMerchant(
       contact_phone: '',
       contact_email: '',
       opportunity_type: 'Everyday',
+      price_category: '£',
       partnership_type: 'Direct',
       partnership_link: '',
       website: '',

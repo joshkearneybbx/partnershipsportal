@@ -236,6 +236,7 @@ export default function PartnerTable({
               {currentTab === 'all' && (
                 <>
                   <th className="p-4 font-medium text-sm whitespace-nowrap">Partnership Type</th>
+                  <th className="p-4 font-medium text-sm whitespace-nowrap">Price</th>
                   <th className="p-4 font-medium text-sm whitespace-nowrap">Status</th>
                 </>
               )}
@@ -357,6 +358,12 @@ export default function PartnerTable({
                                 : 'bg-purple-100 text-purple-700'
                             }`}>
                               {partner.partnership_type}
+                            </span>
+                          </td>
+                          {/* Price Category */}
+                          <td className="p-3">
+                            <span className="px-2 py-1 text-xs rounded-full whitespace-nowrap inline-block w-fit bg-blckbx-dark-sand text-blckbx-black/70">
+                              {partner.price_category || '-'}
                             </span>
                           </td>
                           {/* Status */}

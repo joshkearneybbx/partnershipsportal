@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '@/contexts/ToastContext';
-import { Partner, PartnerStatus, OpportunityType, PartnershipType, LifestyleCategory, PartnerTier, UseForTag, LifecycleStage } from '@/types';
+import { Partner, PartnerStatus, OpportunityType, PartnershipType, LifestyleCategory, PartnerTier, UseForTag, LifecycleStage, PriceCategory } from '@/types';
 
 interface AddPartnerModalProps {
   isOpen: boolean;
@@ -47,6 +47,7 @@ const lifestyleCategories: LifestyleCategory[] = [
 const partnerTiers: PartnerTier[] = ['Preferred', 'Standard', 'Test'];
 const useForTags: UseForTag[] = ['Last-minute', 'VIP/HNW', 'Best value', 'International', 'Gifting'];
 const lifecycleStages: LifecycleStage[] = ['New', 'Growing', 'Mature', 'At Risk'];
+const priceCategories: PriceCategory[] = ['£', '££', '£££', '££££'];
 
 const getEmptyFormData = (defaultStatus: PartnerStatus) => ({
   partner_name: '',
@@ -57,6 +58,7 @@ const getEmptyFormData = (defaultStatus: PartnerStatus) => ({
   contact_phone: '',
   contact_email: '',
   opportunity_type: 'Everyday' as OpportunityType,
+  price_category: '£' as PriceCategory,
   partnership_type: 'Direct' as PartnershipType,
   partnership_link: '',
   website: '',
@@ -100,6 +102,7 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, onEdit, editPa
           contact_phone: editPartner.contact_phone || '',
           contact_email: editPartner.contact_email || '',
           opportunity_type: editPartner.opportunity_type || 'Everyday',
+          price_category: editPartner.price_category || '£',
           partnership_type: editPartner.partnership_type || 'Direct',
           partnership_link: editPartner.partnership_link || '',
           website: editPartner.website || '',
@@ -276,6 +279,26 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, onEdit, editPa
                       <option value="Big Ticket">Big Ticket</option>
                       <option value="Everyday">Everyday</option>
                       <option value="Low Hanging">Low Hanging</option>
+                    </select>
+                  </div>
+
+                  {/* Price Category */}
+                  <div>
+                    <label className="block text-sm font-medium text-blckbx-black mb-1">
+                      Price Category *
+                    </label>
+                    <select
+                      name="price_category"
+                      value={formData.price_category}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-4 py-2.5 border border-blckbx-dark-sand rounded-lg bg-blckbx-sand/30 text-blckbx-black focus:border-blckbx-cta"
+                    >
+                      {priceCategories.map((priceCategory) => (
+                        <option key={priceCategory} value={priceCategory}>
+                          {priceCategory}
+                        </option>
+                      ))}
                     </select>
                   </div>
 

@@ -4,6 +4,7 @@ export type PartnershipType = 'Direct' | 'Affiliate';
 export type PartnerTier = 'Preferred' | 'Standard' | 'Test';
 export type UseForTag = 'Last-minute' | 'VIP/HNW' | 'Best value' | 'International' | 'Gifting';
 export type LifecycleStage = 'New' | 'Growing' | 'Mature' | 'At Risk';
+export type PriceCategory = '£' | '££' | '£££' | '££££';
 export type LifestyleCategory =
   | 'Travel'
   | 'Airline'
@@ -43,6 +44,7 @@ export interface Partner {
   contact_phone: string;
   contact_email: string;
   opportunity_type: OpportunityType;
+  price_category: PriceCategory;
   partnership_type: PartnershipType;
   partnership_link: string;
   website: string;

@@ -202,6 +202,7 @@ export const getPipelineStats = async () => {
     const records = await pb.collection(COLLECTION_NAME).getFullList();
     const partners = records as unknown as Partner[];
 
+    const closed = partners.filter((p) => p.status === 'closed').length;
     const potential = partners.filter((p) => p.status === 'potential').length;
     const contacted = partners.filter((p) => p.status === 'contacted').length;
     const leads = partners.filter((p) => p.status === 'lead').length;
@@ -209,13 +210,13 @@ export const getPipelineStats = async () => {
     const signed = partners.filter((p) => p.status === 'signed').length;
 
     return {
-      closed: 0,
+      closed,
       potential,
       contacted,
       leads,
       negotiation,
       signed,
-      total: potential + contacted + leads + negotiation + signed,
+      total: closed + potential + contacted + leads + negotiation + signed,
     };
   } catch (error) {
     console.error('Error fetching pipeline stats:', error);
