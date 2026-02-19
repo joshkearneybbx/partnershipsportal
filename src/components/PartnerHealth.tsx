@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Fragment, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart,
@@ -17,7 +17,7 @@ import {
   Area,
   AreaChart,
 } from 'recharts';
-import { Partner, LifestyleCategory } from '@/types';
+import { BigPurchase, Partner, LifestyleCategory } from '@/types';
 import {
   StripeUpload,
   ProcessedTransaction,
@@ -53,6 +53,7 @@ import {
   getUploadForMonth,
 } from '@/lib/stripe';
 import { pb } from '@/lib/pocketbase';
+import { getBigPurchases, updateBigPurchase, updatePartner } from '@/lib/pocketbase';
 import { useToast } from '@/contexts/ToastContext';
 import { format, differenceInDays, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 
@@ -60,7 +61,7 @@ interface PartnerHealthProps {
   partners: Partner[];
 }
 
-type SubTab = 'overview' | 'discovery';
+type SubTab = 'overview' | 'discovery' | 'invoice-tracker';
 
 const RAG_COLORS = {
   green: '#1EA988',
@@ -919,6 +920,7 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
   const [activeTab, setActiveTab] = useState<SubTab>('overview');
   const [uploads, setUploads] = useState<StripeUpload[]>([]);
   const [transactions, setTransactions] = useState<ProcessedTransaction[]>([]);
+  const [bigPurchases, setBigPurchases] = useState<BigPurchase[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedPartner, setSelectedPartner] = useState<PartnerRevenueStats | null>(null);
@@ -929,6 +931,8 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
   // Assign to partner modal state
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedMerchantForAssign, setSelectedMerchantForAssign] = useState<{ name: string; category: LifestyleCategory | '' } | null>(null);
+  const [showCopiedToast, setShowCopiedToast] = useState(false);
+  const copiedToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Delete confirmation state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -936,6 +940,8 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
   
   // Month selector state - 'all' for all time, or specific month string 'YYYY-MM'
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [expandedInvoicePartner, setExpandedInvoicePartner] = useState<string | null>(null);
+  const [updatingInvoicePartner, setUpdatingInvoicePartner] = useState<string | null>(null);
 
   // Filter to only signed partners for matching
   const signedPartners = useMemo(() => 
@@ -967,6 +973,9 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
     try {
       const authToken = pb.authStore.token;
       if (!authToken) return;
+
+      const bigPurchasesData = await getBigPurchases();
+      setBigPurchases(bigPurchasesData);
 
       const uploadsData = await fetchUploads(authToken);
       console.log('[DEBUG] Uploads loaded:', uploadsData.length);
@@ -1035,6 +1044,14 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    return () => {
+      if (copiedToastTimeoutRef.current) {
+        clearTimeout(copiedToastTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Compute metrics
   const { totalRevenue, totalCommission, activePartners, partnerStats, nonPartnerMerchants } =
@@ -1220,6 +1237,201 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
     return Array.from(cats).sort();
   }, [nonPartnerMerchants]);
 
+  const partnerMap = useMemo(() => {
+    return new Map(partners.map((partner) => [partner.id, partner]));
+  }, [partners]);
+
+  const getPurchaseAmountDue = useCallback((purchase: BigPurchase): number => {
+    if (purchase.amount_to_invoice !== null && purchase.amount_to_invoice !== undefined) {
+      return Number(purchase.amount_to_invoice) || 0;
+    }
+    return Number(purchase.estimated_amount) || 0;
+  }, []);
+
+  const invoicePartners = useMemo(() => {
+    const grouped = new Map<
+      string,
+      {
+        partnerName: string;
+        purchases: BigPurchase[];
+        totalPurchases: number;
+        totalAmount: number;
+        commissionValue: string;
+        partnerIds: string[];
+        hasCommissionSource: boolean;
+        hasBigPurchaseSource: boolean;
+        invoiced: boolean;
+      }
+    >();
+
+    for (const purchase of bigPurchases) {
+      const partnerName = (purchase.partner_name || 'Unknown Partner').trim() || 'Unknown Partner';
+      const existing = grouped.get(partnerName);
+
+      if (existing) {
+        existing.purchases.push(purchase);
+        existing.totalPurchases += 1;
+        existing.totalAmount += getPurchaseAmountDue(purchase);
+        existing.hasBigPurchaseSource = true;
+      } else {
+        grouped.set(partnerName, {
+          partnerName,
+          purchases: [purchase],
+          totalPurchases: 1,
+          totalAmount: getPurchaseAmountDue(purchase),
+          commissionValue: '',
+          partnerIds: [],
+          hasCommissionSource: false,
+          hasBigPurchaseSource: true,
+          invoiced: false,
+        });
+      }
+    }
+
+    const commissionPartners = partners.filter(
+      (partner) => typeof partner.commission === 'string' && partner.commission.trim() !== ''
+    );
+
+    for (const partner of commissionPartners) {
+      const partnerName = (partner.partner_name || 'Unknown Partner').trim() || 'Unknown Partner';
+      const commissionValue = partner.commission.trim();
+      const existing = grouped.get(partnerName);
+
+      if (existing) {
+        existing.hasCommissionSource = true;
+        existing.commissionValue = existing.commissionValue || commissionValue;
+        if (!existing.partnerIds.includes(partner.id)) {
+          existing.partnerIds.push(partner.id);
+        }
+      } else {
+        grouped.set(partnerName, {
+          partnerName,
+          purchases: [],
+          totalPurchases: 0,
+          totalAmount: 0,
+          commissionValue,
+          partnerIds: [partner.id],
+          hasCommissionSource: true,
+          hasBigPurchaseSource: false,
+          invoiced: !!partner.commission_invoiced,
+        });
+      }
+    }
+
+    const result = Array.from(grouped.values()).map((group) => ({
+      ...group,
+      purchases: [...group.purchases].sort((a, b) => new Date(b.purchase_date).getTime() - new Date(a.purchase_date).getTime()),
+      invoiced:
+        (group.purchases.length === 0 || group.purchases.every((purchase) => !!purchase.invoiced)) &&
+        (group.partnerIds.length === 0 || group.partnerIds.every((partnerId) => !!partnerMap.get(partnerId)?.commission_invoiced)),
+    }));
+
+    return result.sort((a, b) => b.totalAmount - a.totalAmount);
+  }, [bigPurchases, getPurchaseAmountDue, partnerMap, partners]);
+
+  const invoicedByPartnerId = useMemo(() => {
+    const map = new Map<string, boolean>();
+
+    for (const partner of partners) {
+      const partnerName = (partner.partner_name || 'Unknown Partner').trim() || 'Unknown Partner';
+      const relatedPurchases = bigPurchases.filter(
+        (purchase) =>
+          ((purchase.partner_name || 'Unknown Partner').trim() || 'Unknown Partner') === partnerName ||
+          purchase.partner_id === partner.id
+      );
+      const purchasesInvoiced = relatedPurchases.length > 0 && relatedPurchases.every((purchase) => !!purchase.invoiced);
+      const commissionInvoiced = !!partner.commission_invoiced;
+      map.set(partner.id, purchasesInvoiced || commissionInvoiced);
+    }
+
+    return map;
+  }, [bigPurchases, partners]);
+
+  const handlePartnerInvoicedToggle = useCallback(
+    async (
+      partnerName: string,
+      checked: boolean,
+      purchasesForPartner: BigPurchase[],
+      partnerIds: string[]
+    ) => {
+      if (purchasesForPartner.length === 0 && partnerIds.length === 0) return;
+
+      setUpdatingInvoicePartner(partnerName);
+      try {
+        const purchaseUpdates = purchasesForPartner.map(async (purchase) => {
+            const updated = await updateBigPurchase(purchase.id, { invoiced: checked });
+            const payload = {
+              id: purchase.id,
+              partner_name: updated?.partner_name ?? purchase.partner_name,
+              estimated_amount: updated?.estimated_amount ?? purchase.estimated_amount,
+              amount_to_invoice:
+                updated?.amount_to_invoice !== undefined ? updated.amount_to_invoice : purchase.amount_to_invoice,
+              invoiced: updated?.invoiced ?? checked,
+            };
+
+            const webhookResponse = await fetch('/api/big-purchase-status-webhook', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(payload),
+            });
+
+            if (!webhookResponse.ok) {
+              const errorPayload = await webhookResponse.json().catch(() => ({}));
+              console.error('Big purchase invoiced webhook failed:', errorPayload);
+            }
+          });
+
+        const commissionUpdates = partnerIds.map((partnerId) =>
+          updatePartner(partnerId, { commission_invoiced: checked })
+        );
+
+        await Promise.all([...purchaseUpdates, ...commissionUpdates]);
+        showSuccess(`Updated invoiced status for ${partnerName}`);
+        await loadData();
+      } catch (error) {
+        console.error('Failed to update invoiced status and/or webhook:', error);
+        showError('Failed to update invoiced status');
+      } finally {
+        setUpdatingInvoicePartner(null);
+      }
+    },
+    [loadData, showError, showSuccess]
+  );
+
+  const handleCopyInvoiceBlock = useCallback(
+    async (purchase: BigPurchase) => {
+      const linkedPartner = purchase.partner_id ? partnerMap.get(purchase.partner_id) : null;
+      const recipient = linkedPartner?.contact_email || purchase.poc || '-';
+      const amountDue = new Intl.NumberFormat('en-GB', {
+        style: 'currency',
+        currency: 'GBP',
+        maximumFractionDigits: 0,
+      }).format(getPurchaseAmountDue(purchase));
+
+      const invoiceBlock =
+        `Partner: ${purchase.partner_name}\n` +
+        `Email: ${recipient}\n` +
+        `Amount Due: ${amountDue}\n` +
+        `Commission Notes: ${purchase.commission_notes || '-'}`;
+
+      try {
+        await navigator.clipboard.writeText(invoiceBlock);
+        setShowCopiedToast(true);
+        if (copiedToastTimeoutRef.current) {
+          clearTimeout(copiedToastTimeoutRef.current);
+        }
+        copiedToastTimeoutRef.current = setTimeout(() => {
+          setShowCopiedToast(false);
+        }, 2500);
+      } catch (error) {
+        showError('Failed to copy invoice block');
+      }
+    },
+    [getPurchaseAmountDue, partnerMap, showError]
+  );
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -1228,49 +1440,10 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
     );
   }
 
-  if (uploads.length === 0) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center py-20"
-      >
-        <div className="w-24 h-24 bg-blckbx-cta/10 rounded-full flex items-center justify-center mx-auto mb-6">
-          <svg className="w-12 h-12 text-blckbx-cta" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z"
-            />
-          </svg>
-        </div>
-        <h3 className="font-display text-2xl font-semibold text-blckbx-black mb-2">No Data Yet</h3>
-        <p className="text-blckbx-black/60 mb-6 max-w-md mx-auto">
-          Upload your first Stripe CSV to start tracking partner revenue, commission, and discover new opportunities.
-        </p>
-        <button
-          onClick={() => setShowUploadModal(true)}
-          className="flex items-center gap-2 bg-blckbx-cta text-blckbx-black px-6 py-3 rounded-lg font-medium hover:bg-opacity-90 transition-all mx-auto"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Upload Stripe CSV
-        </button>
-        <UploadModal
-          isOpen={showUploadModal}
-          onClose={() => setShowUploadModal(false)}
-          onUploadComplete={loadData}
-          signedPartners={signedPartners}
-        />
-      </motion.div>
-    );
-  }
-
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
       {/* Header with Month Selector */}
+      {activeTab !== 'invoice-tracker' && (
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-3">
           {uploads.length > 0 && (
@@ -1331,8 +1504,10 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
           </button>
         </div>
       </div>
+      )}
 
       {/* KPI Cards */}
+      {activeTab !== 'invoice-tracker' && (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1415,12 +1590,14 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
           <p className="text-blckbx-black/60 text-sm mt-2">{uploads[0]?.matched_count || 0} matched</p>
         </motion.div>
       </div>
+      )}
 
       {/* Sub-tabs */}
       <div className="flex gap-2 border-b border-blckbx-black/10">
         {[
           { id: 'overview', label: 'Overview' },
           { id: 'discovery', label: 'Discovery' },
+          { id: 'invoice-tracker', label: 'Invoice Tracker' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -1442,6 +1619,175 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
         ))}
       </div>
 
+      {/* Invoice Tracker Tab */}
+      {activeTab === 'invoice-tracker' && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-blckbx-dark-sand overflow-hidden">
+            <div className="p-4 border-b border-blckbx-dark-sand flex items-center justify-between">
+              <h3 className="font-display text-xl font-semibold text-blckbx-black">Invoice Tracker</h3>
+              <span className="text-sm text-blckbx-black/60">{invoicePartners.length} partners</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-blckbx-dark-sand bg-blckbx-dark-sand">
+                    <th className="text-left py-3 px-4 text-sm font-medium text-blckbx-black">Partner Name</th>
+                    <th className="text-right py-3 px-4 text-sm font-medium text-blckbx-black">Total Purchases</th>
+                    <th className="text-right py-3 px-4 text-sm font-medium text-blckbx-black">Total Amount</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-blckbx-black">Commission</th>
+                    <th className="text-center py-3 px-4 text-sm font-medium text-blckbx-black">Invoiced</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoicePartners.map((group, index) => (
+                    <Fragment key={group.partnerName}>
+                      <motion.tr
+                        key={group.partnerName}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.02 }}
+                        className={`border-b border-blckbx-dark-sand/50 hover:bg-blckbx-sand/30 cursor-pointer ${
+                          expandedInvoicePartner === group.partnerName ? 'bg-blckbx-sand/30' : index % 2 === 0 ? 'bg-white' : 'bg-blckbx-sand/20'
+                        } ${group.invoiced ? 'opacity-60' : ''}`}
+                        onClick={() =>
+                          setExpandedInvoicePartner((current) =>
+                            current === group.partnerName ? null : group.partnerName
+                          )
+                        }
+                      >
+                        <td className="py-3 px-4 text-sm text-blckbx-black font-medium">
+                          <div className="flex items-center gap-2">
+                            <svg
+                              className={`w-4 h-4 text-blckbx-black/50 transition-transform ${
+                                expandedInvoicePartner === group.partnerName ? 'rotate-90' : ''
+                              }`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            <span className={group.invoiced ? 'line-through' : ''}>{group.partnerName}</span>
+                            {group.invoiced && (
+                              <span className="px-2 py-0.5 rounded-full text-[11px] bg-green-100 text-green-700">
+                                Invoiced ✓
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-right text-sm text-blckbx-black/70">{group.totalPurchases}</td>
+                        <td className="py-3 px-4 text-right text-sm font-medium text-blckbx-black">
+                          {new Intl.NumberFormat('en-GB', {
+                            style: 'currency',
+                            currency: 'GBP',
+                            maximumFractionDigits: 0,
+                          }).format(group.totalAmount)}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-blckbx-black/70">{group.commissionValue || '-'}</td>
+                        <td className="py-3 px-4 text-center" onClick={(event) => event.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={group.invoiced}
+                            disabled={updatingInvoicePartner === group.partnerName}
+                            onChange={(event) =>
+                              void handlePartnerInvoicedToggle(
+                                group.partnerName,
+                                event.target.checked,
+                                group.purchases,
+                                group.partnerIds
+                              )
+                            }
+                            className="custom-checkbox"
+                          />
+                        </td>
+                      </motion.tr>
+                      <AnimatePresence>
+                        {expandedInvoicePartner === group.partnerName && (
+                          <motion.tr
+                            key={`${group.partnerName}-detail`}
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="bg-blckbx-sand/30"
+                          >
+                            <td colSpan={5} className="p-4">
+                              <div className="space-y-3">
+                                {group.hasCommissionSource && group.commissionValue && (
+                                  <div className="bg-white rounded-lg border border-blckbx-dark-sand p-4">
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <p className="text-xs text-blckbx-black/50">Commission Value</p>
+                                        <p className="text-sm font-medium text-blckbx-black">{group.commissionValue}</p>
+                                      </div>
+                                      {group.partnerIds.length > 0 && (
+                                        <span className="text-xs text-blckbx-black/50">
+                                          {group.partnerIds.length} commission partner{group.partnerIds.length > 1 ? 's' : ''}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                                {group.purchases.map((purchase) => (
+                                  <div key={purchase.id} className="bg-white rounded-lg border border-blckbx-dark-sand p-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                                      <div>
+                                        <p className="text-xs text-blckbx-black/50">POC</p>
+                                        <p className="text-sm text-blckbx-black">{purchase.poc || '-'}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-blckbx-black/50">Amount</p>
+                                        <p className="text-sm text-blckbx-black font-medium">
+                                          {new Intl.NumberFormat('en-GB', {
+                                            style: 'currency',
+                                            currency: 'GBP',
+                                            maximumFractionDigits: 0,
+                                          }).format(getPurchaseAmountDue(purchase))}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-blckbx-black/50">Purchase Date</p>
+                                        <p className="text-sm text-blckbx-black">
+                                          {purchase.purchase_date ? format(new Date(purchase.purchase_date), 'dd MMM yyyy') : '-'}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-blckbx-black/50">Category</p>
+                                        <p className="text-sm text-blckbx-black">{purchase.category || '-'}</p>
+                                      </div>
+                                      <div className="md:col-span-2">
+                                        <p className="text-xs text-blckbx-black/50">Commission Notes</p>
+                                        <p className="text-sm text-blckbx-black">{purchase.commission_notes || '-'}</p>
+                                      </div>
+                                    </div>
+                                    <div className="mt-3 flex justify-end">
+                                      <button
+                                        onClick={() => void handleCopyInvoiceBlock(purchase)}
+                                        className="px-3 py-1.5 rounded-lg bg-[#D4A843] text-blckbx-black text-sm font-medium hover:bg-opacity-90 transition-colors"
+                                      >
+                                        Copy to Clipboard
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          </motion.tr>
+                        )}
+                      </AnimatePresence>
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+              {invoicePartners.length === 0 && (
+                <div className="text-center py-12 text-blckbx-black/50">
+                  No big purchases available for invoice tracking yet
+                </div>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Overview Tab */}
       {activeTab === 'overview' && (
         <motion.div
@@ -1449,6 +1795,35 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
           animate={{ opacity: 1, y: 0 }}
           className="space-y-6"
         >
+          {uploads.length === 0 && (
+            <div className="text-center py-20">
+              <div className="w-24 h-24 bg-blckbx-cta/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-12 h-12 text-blckbx-cta" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z"
+                  />
+                </svg>
+              </div>
+              <h3 className="font-display text-2xl font-semibold text-blckbx-black mb-2">No Data Yet</h3>
+              <p className="text-blckbx-black/60 mb-6 max-w-md mx-auto">
+                Upload your first Stripe CSV to start tracking partner revenue, commission, and discover new opportunities.
+              </p>
+              <button
+                onClick={() => setShowUploadModal(true)}
+                className="flex items-center gap-2 bg-blckbx-cta text-blckbx-black px-6 py-3 rounded-lg font-medium hover:bg-opacity-90 transition-all mx-auto"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Upload Stripe CSV
+              </button>
+            </div>
+          )}
+          {uploads.length > 0 && (
+          <>
           {/* Revenue Trend Chart */}
           <div className="bg-blckbx-black rounded-2xl p-6">
             <div className="flex justify-between items-center mb-6">
@@ -1633,7 +2008,14 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
                       >
                         <td className="py-3 px-4">
                           <div>
-                            <p className="font-medium text-blckbx-black">{stats.partner.partner_name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-blckbx-black">{stats.partner.partner_name}</p>
+                              {invoicedByPartnerId.get(stats.partner.id) && (
+                                <span className="px-2 py-0.5 rounded-full text-[11px] bg-green-100 text-green-700">
+                                  Invoiced ✓
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-blckbx-black/50">{stats.partner.lifestyle_category}</p>
                           </div>
                         </td>
@@ -1668,6 +2050,8 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
               </table>
             </div>
           </div>
+          </>
+          )}
         </motion.div>
       )}
 
@@ -1985,6 +2369,12 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {showCopiedToast && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999] px-4 py-2 rounded-lg bg-blckbx-black text-blckbx-sand text-sm font-medium shadow-lg">
+          Copied to clipboard ✓
+        </div>
+      )}
     </motion.div>
   );
 }

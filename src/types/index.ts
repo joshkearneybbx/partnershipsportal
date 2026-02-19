@@ -34,6 +34,9 @@ export type LifestyleCategory =
   | 'Experiences'
   | "Children's Parties and Events";
 
+export type BigPurchaseStatus = 'flagged' | 'purchased';
+export type BigPurchaseCategory = 'Hotel' | 'Restaurant' | 'Wellness' | 'Retail' | 'Travel' | 'Gifting' | 'Other';
+
 export interface Partner {
   id: string;
   partner_name: string;
@@ -62,6 +65,7 @@ export interface Partner {
   when_not_to_use: string;
   sla_notes: string;
   commission: string;
+  commission_invoiced?: boolean;
 
   // Negotiation checkboxes (only for Direct partnerships)
   contacted: boolean;
@@ -72,12 +76,30 @@ export interface Partner {
 
   // Stripe integration
   stripe_aliases: string[];
+  partner_agreement?: string[];
 
   // Timestamps
   created: string;
   updated: string;
   lead_date: string | null;
   signed_at: string | null;
+}
+
+export interface BigPurchase {
+  id: string;
+  partner_name: string;
+  poc: string;
+  estimated_amount: number;
+  amount_to_invoice: number | null;
+  purchase_date: string;
+  category: BigPurchaseCategory;
+  commission_notes: string;
+  status: BigPurchaseStatus;
+  invoiced: boolean;
+  partner_id: string | null;
+  moved_to_potential?: boolean;
+  created: string;
+  updated: string;
 }
 
 export interface WeeklyStats {

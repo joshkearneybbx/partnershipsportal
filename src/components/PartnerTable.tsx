@@ -9,6 +9,8 @@ interface PartnerTableProps {
   partners: Partner[];
   currentTab: 'closed' | 'potential' | 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all';
   onUpdate: (id: string, updates: Partial<Partner>) => Promise<void>;
+  onUploadAgreement: (id: string, file: File) => Promise<void>;
+  onDeleteAgreement: (id: string, fileName: string) => Promise<void>;
   onMove: (id: string, newStatus: PartnerStatus, currentStatus?: PartnerStatus) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onSendToCore: (partner: Partner) => Promise<void>;
@@ -24,6 +26,8 @@ export default function PartnerTable({
   partners,
   currentTab,
   onUpdate,
+  onUploadAgreement,
+  onDeleteAgreement,
   onMove,
   onDelete,
   onSendToCore,
@@ -35,6 +39,11 @@ export default function PartnerTable({
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [uploadingAgreementId, setUploadingAgreementId] = useState<string | null>(null);
+  const [deletingAgreementKey, setDeletingAgreementKey] = useState<string | null>(null);
+
+  const POCKETBASE_FILES_BASE_URL = 'https://pocketbase.blckbx.co.uk/api/files';
+  const showAgreementColumn = currentTab === 'all' || currentTab === 'signed';
 
   const getTierBadgeStyle = (tier: PartnerTier) => {
     switch (tier) {
@@ -139,6 +148,45 @@ export default function PartnerTable({
     }
   };
 
+  const getPartnerAgreementFiles = (partner: Partner): string[] => {
+    const raw = (partner as unknown as { partner_agreement?: unknown }).partner_agreement;
+    if (!raw) return [];
+    if (Array.isArray(raw)) {
+      return raw.filter((file): file is string => typeof file === 'string' && file.length > 0);
+    }
+    if (typeof raw === 'string' && raw.length > 0) {
+      return [raw];
+    }
+    return [];
+  };
+
+  const getAgreementUrl = (partner: Partner, fileName: string): string => {
+    const recordMeta = partner as unknown as { collectionId?: string; collectionName?: string };
+    const collectionRef = recordMeta.collectionId || recordMeta.collectionName || 'partnership_portal';
+    return `${POCKETBASE_FILES_BASE_URL}/${collectionRef}/${partner.id}/${encodeURIComponent(fileName)}`;
+  };
+
+  const handleAgreementUpload = async (partnerId: string, file: File | null) => {
+    if (!file) return;
+    setUploadingAgreementId(partnerId);
+    try {
+      await onUploadAgreement(partnerId, file);
+    } finally {
+      setUploadingAgreementId(null);
+    }
+  };
+
+  const handleAgreementDelete = async (partnerId: string, fileName: string) => {
+    if (!confirm('Delete this file?')) return;
+    const deleteKey = `${partnerId}:${fileName}`;
+    setDeletingAgreementKey(deleteKey);
+    try {
+      await onDeleteAgreement(partnerId, fileName);
+    } finally {
+      setDeletingAgreementKey(null);
+    }
+  };
+
   const getDaysInPipeline = (partner: Partner): number => {
     const endDate = partner.signed_at ? new Date(partner.signed_at) : new Date();
     // Use lead_date if available (for partners that started in contacted status)
@@ -221,6 +269,9 @@ export default function PartnerTable({
               )}
               {currentTab !== 'all' && (
                 <th className="p-4 font-medium text-sm whitespace-nowrap">Contact</th>
+              )}
+              {showAgreementColumn && (
+                <th className="p-4 font-medium text-sm whitespace-nowrap">Partner Agreement</th>
               )}
               <th
                 className="p-4 font-medium text-sm cursor-pointer hover:bg-blckbx-cta/80 transition-colors whitespace-nowrap"
@@ -332,6 +383,62 @@ export default function PartnerTable({
                                 {partner.contact_email}
                               </a>
                             )}
+                          </div>
+                        </td>
+                      )}
+                      {showAgreementColumn && (
+                        <td className="p-3">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex flex-wrap gap-1">
+                              {getPartnerAgreementFiles(partner).length > 0 ? (
+                                getPartnerAgreementFiles(partner).map((file, fileIndex) => (
+                                  <span
+                                    key={`${partner.id}-${file}-${fileIndex}`}
+                                    className="inline-flex items-center gap-1"
+                                  >
+                                    <a
+                                      href={getAgreementUrl(partner, file)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700 hover:underline"
+                                      onClick={(event) => event.stopPropagation()}
+                                    >
+                                      Agreement {fileIndex + 1}
+                                    </a>
+                                    <button
+                                      type="button"
+                                      title="Delete file"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        void handleAgreementDelete(partner.id, file);
+                                      }}
+                                      disabled={deletingAgreementKey === `${partner.id}:${file}`}
+                                      className="text-xs leading-none text-blckbx-black/40 hover:text-red-600 transition-colors disabled:opacity-40"
+                                    >
+                                      ×
+                                    </button>
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-xs text-blckbx-black/50">No file</span>
+                              )}
+                            </div>
+                            <label
+                              className={`text-xs px-2 py-1 rounded w-fit cursor-pointer transition-colors ${
+                                uploadingAgreementId === partner.id
+                                  ? 'bg-blckbx-dark-sand text-blckbx-black/50'
+                                  : 'bg-blckbx-cta/20 text-blckbx-black hover:bg-blckbx-cta/30'
+                              }`}
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              {uploadingAgreementId === partner.id ? 'Uploading...' : 'Attach'}
+                              <input
+                                type="file"
+                                className="hidden"
+                                onChange={(event) => void handleAgreementUpload(partner.id, event.target.files?.[0] || null)}
+                                disabled={uploadingAgreementId === partner.id}
+                              />
+                            </label>
                           </div>
                         </td>
                       )}

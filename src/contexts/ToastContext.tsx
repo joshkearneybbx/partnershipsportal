@@ -8,10 +8,11 @@ interface Toast {
   id: string;
   message: string;
   variant: ToastVariant;
+  duration?: number;
 }
 
 interface ToastContextType {
-  showToast: (message: string, variant?: ToastVariant) => void;
+  showToast: (message: string, variant?: ToastVariant, duration?: number) => void;
   showSuccess: (message: string) => void;
   showError: (message: string) => void;
   showWarning: (message: string) => void;
@@ -41,9 +42,9 @@ export function ToastProvider({ children }: ToastProviderProps) {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
-  const showToast = useCallback((message: string, variant: ToastVariant = 'info') => {
+  const showToast = useCallback((message: string, variant: ToastVariant = 'info', duration?: number) => {
     const id = `toast-${toastId++}`;
-    const newToast: Toast = { id, message, variant };
+    const newToast: Toast = { id, message, variant, duration };
     setToasts((prev) => [...prev, newToast]);
   }, []);
 
@@ -74,7 +75,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2 pointer-events-none w-full max-w-md px-4">
         <AnimatePresence mode="popLayout">
           {toasts.map((toast) => (
             <div key={toast.id} className="pointer-events-auto">
@@ -82,6 +83,7 @@ export function ToastProvider({ children }: ToastProviderProps) {
                 id={toast.id}
                 message={toast.message}
                 variant={toast.variant}
+                duration={toast.duration}
                 onRemove={removeToast}
               />
             </div>

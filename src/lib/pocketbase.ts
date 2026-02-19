@@ -1,8 +1,9 @@
 import PocketBase from 'pocketbase';
-import { Partner } from '@/types';
+import { BigPurchase, BigPurchaseCategory, Partner } from '@/types';
 
 const POCKETBASE_URL = 'https://pocketbase.blckbx.co.uk';
 const COLLECTION_NAME = 'partnership_portal';
+const BIG_PURCHASES_COLLECTION = 'big_purchases';
 
 // Create PocketBase instance
 export const pb = new PocketBase(POCKETBASE_URL);
@@ -33,11 +34,21 @@ export const getPartners = async (): Promise<Partner[]> => {
     // DEBUG: Log stripe_aliases structure for first few partners
     console.log('[PocketBase] DEBUG: First 5 partners stripe_aliases:');
     records.slice(0, 5).forEach((r: unknown, i: number) => {
-      const record = r as { partner_name?: string; stripe_aliases?: unknown };
+      const record = r as { partner_name?: string; stripe_aliases?: unknown; partner_agreement?: unknown };
       console.log(`  [${i}] ${record.partner_name}:`, JSON.stringify({
         value: record.stripe_aliases,
         type: typeof record.stripe_aliases,
         isArray: Array.isArray(record.stripe_aliases),
+      }));
+    });
+
+    console.log('[PocketBase] DEBUG: First 5 partners partner_agreement:');
+    records.slice(0, 5).forEach((r: unknown, i: number) => {
+      const record = r as { partner_name?: string; partner_agreement?: unknown };
+      console.log(`  [${i}] ${record.partner_name}:`, JSON.stringify({
+        value: record.partner_agreement,
+        type: typeof record.partner_agreement,
+        isArray: Array.isArray(record.partner_agreement),
       }));
     });
     
@@ -89,6 +100,52 @@ export const updatePartner = async (
   } catch (error) {
     console.error('Error updating partner:', error);
     throw error;
+  }
+};
+
+export const uploadPartnerAgreement = async (
+  id: string,
+  file: File
+): Promise<Partner | null> => {
+  try {
+    const formData = new FormData();
+    // For multi-file fields in PocketBase, "+" appends instead of replacing.
+    formData.append('partner_agreement+', file);
+    const record = await pb.collection(COLLECTION_NAME).update(id, formData);
+    return record as unknown as Partner;
+  } catch (error) {
+    // Fallback for single-file schema setup.
+    const fallbackFormData = new FormData();
+    fallbackFormData.append('partner_agreement', file);
+    const record = await pb.collection(COLLECTION_NAME).update(id, fallbackFormData);
+    return record as unknown as Partner;
+  }
+};
+
+export const deletePartnerAgreementFile = async (
+  id: string,
+  fileName: string
+): Promise<Partner | null> => {
+  try {
+    const formData = new FormData();
+    // PocketBase file field remove syntax for multi-file fields.
+    formData.append('partner_agreement-', fileName);
+    const record = await pb.collection(COLLECTION_NAME).update(id, formData);
+    return record as unknown as Partner;
+  } catch (error) {
+    // Fallback: overwrite with filtered list if remove syntax is not accepted.
+    const existing = await pb.collection(COLLECTION_NAME).getOne(id);
+    const raw = (existing as unknown as { partner_agreement?: unknown }).partner_agreement;
+    const files = Array.isArray(raw)
+      ? raw.filter((v): v is string => typeof v === 'string')
+      : typeof raw === 'string' && raw.length > 0
+      ? [raw]
+      : [];
+    const updated = files.filter((name) => name !== fileName);
+    const record = await pb.collection(COLLECTION_NAME).update(id, {
+      partner_agreement: updated,
+    });
+    return record as unknown as Partner;
   }
 };
 
@@ -221,6 +278,109 @@ export const getPipelineStats = async () => {
   } catch (error) {
     console.error('Error fetching pipeline stats:', error);
     return { closed: 0, potential: 0, contacted: 0, leads: 0, negotiation: 0, signed: 0, total: 0 };
+  }
+};
+
+const mapBigPurchaseCategoryToLifestyle = (category: BigPurchaseCategory): Partner['lifestyle_category'] => {
+  switch (category) {
+    case 'Hotel':
+      return 'Hotels';
+    case 'Restaurant':
+      return 'Restaurants';
+    case 'Travel':
+      return 'Travel';
+    case 'Wellness':
+      return 'Wellness';
+    case 'Retail':
+      return 'Retail';
+    default:
+      return 'Misc';
+  }
+};
+
+export const getBigPurchases = async (): Promise<BigPurchase[]> => {
+  try {
+    const records = await pb.collection(BIG_PURCHASES_COLLECTION).getFullList({
+      sort: '-created',
+    });
+    return records as unknown as BigPurchase[];
+  } catch (error) {
+    console.error('Error fetching big purchases:', error);
+    return [];
+  }
+};
+
+export const updateBigPurchase = async (
+  id: string,
+  updates: Partial<BigPurchase>
+): Promise<BigPurchase | null> => {
+  try {
+    const record = await pb.collection(BIG_PURCHASES_COLLECTION).update(id, updates);
+    return record as unknown as BigPurchase;
+  } catch (error) {
+    console.error('Error updating big purchase:', error);
+    throw error;
+  }
+};
+
+export const moveBigPurchaseToPotentialLead = async (
+  purchase: BigPurchase
+): Promise<{ partner: Partner | null }> => {
+  try {
+    const newPartnerPayload: Omit<Partner, 'id' | 'created' | 'updated'> = {
+      partner_name: purchase.partner_name,
+      description: '',
+      lifestyle_category: mapBigPurchaseCategoryToLifestyle(purchase.category),
+      contact_name: purchase.poc || '',
+      contact_position: '',
+      contact_phone: '',
+      contact_email: '',
+      opportunity_type: 'Everyday',
+      price_category: '£',
+      partnership_type: 'Direct',
+      partnership_link: '',
+      website: '',
+      login_notes: '',
+      status: 'potential',
+      partner_tier: 'Standard',
+      use_for_tags: [],
+      lifecycle_stage: 'New',
+      is_default: false,
+      partner_brief: '',
+      when_not_to_use: '',
+      sla_notes: '',
+      commission: '',
+      contacted: false,
+      call_booked: false,
+      call_had: false,
+      contract_sent: false,
+      contract_signed: false,
+      stripe_aliases: [],
+      lead_date: null,
+      signed_at: null,
+    };
+
+    const createdPartner = await createPartner(newPartnerPayload);
+    if (!createdPartner) {
+      throw new Error('Failed to create potential lead from big purchase');
+    }
+
+    try {
+      await updateBigPurchase(purchase.id, {
+        partner_id: createdPartner.id,
+        moved_to_potential: true,
+      });
+    } catch (error) {
+      console.warn('Failed to set moved_to_potential flag, retrying with partner_id only:', error);
+      await updateBigPurchase(purchase.id, {
+        partner_id: createdPartner.id,
+      });
+    }
+
+    return { partner: createdPartner };
+  } catch (error) {
+    console.error('Error moving big purchase to potential lead:', error);
+    throw error;
   }
 };
 

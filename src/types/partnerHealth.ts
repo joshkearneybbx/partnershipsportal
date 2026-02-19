@@ -63,5 +63,5 @@ export interface CSVRow {
   amount: string;
 }
 
-export type HealthSubTab = 'overview' | 'partner-usage' | 'discovery';
+export type HealthSubTab = 'overview' | 'partner-usage' | 'discovery' | 'invoice-tracker';
 export type DiscoverySort = 'frequency' | 'spend' | 'recency';

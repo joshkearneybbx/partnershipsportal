@@ -5,12 +5,23 @@ import { motion } from 'framer-motion';
 import { PipelineStats } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 
-type TabType = 'dashboard' | 'closed' | 'potential' | 'contacted' | 'leads' | 'negotiation' | 'signed' | 'all' | 'partner-health';
+type TabType =
+  | 'dashboard'
+  | 'closed'
+  | 'potential'
+  | 'contacted'
+  | 'leads'
+  | 'negotiation'
+  | 'signed'
+  | 'all'
+  | 'partner-health'
+  | 'big-purchases';
 
 interface SidebarProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
   pipelineStats: PipelineStats;
+  bigPurchasesPurchasedCount: number;
   onExpandedChange?: (expanded: boolean) => void;
 }
 
@@ -96,9 +107,24 @@ const navItems: { id: TabType; label: string; icon: JSX.Element }[] = [
       </svg>
     ),
   },
+  {
+    id: 'big-purchases',
+    label: 'Big Purchases',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14l-1.2 10.2a2 2 0 01-2 1.8H8.2a2 2 0 01-2-1.8L5 8zM9 8V6a3 3 0 016 0v2" />
+      </svg>
+    ),
+  },
 ];
 
-export default function Sidebar({ activeTab, setActiveTab, pipelineStats, onExpandedChange }: SidebarProps) {
+export default function Sidebar({
+  activeTab,
+  setActiveTab,
+  pipelineStats,
+  bigPurchasesPurchasedCount,
+  onExpandedChange,
+}: SidebarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const { user, logout } = useAuth();
 
@@ -128,6 +154,8 @@ export default function Sidebar({ activeTab, setActiveTab, pipelineStats, onExpa
         return pipelineStats.signed;
       case 'all':
         return pipelineStats.total; // Show all partners including potential
+      case 'big-purchases':
+        return bigPurchasesPurchasedCount;
       default:
         return undefined;
     }
