@@ -213,10 +213,10 @@ export function isTransactionEligibleForPartner(
     if (!warnedPartnersMissingSignedAt.has(partner.id)) {
       warnedPartnersMissingSignedAt.add(partner.id);
       console.warn(
-        `[Partner Attribution] Signed partner "${partner.partner_name}" (${partner.id}) has no signed_at. Skipping attribution.`
+        `[Partner Attribution] Signed partner "${partner.partner_name}" (${partner.id}) has no signed_at. Allowing attribution without date gate.`
       );
     }
-    return false;
+    return true;
   }
 
   const transactionDateKey = getDateKey(transactionDate);
@@ -341,34 +341,47 @@ export function findFuzzyMatches(
  * Parse stripe_aliases from various formats PocketBase might return
  */
 function parseStripeAliases(aliases: unknown): string[] {
-  console.log('[DEBUG] Raw stripe_aliases value:', JSON.stringify(aliases));
-  console.log('[DEBUG] Type:', typeof aliases);
-
   if (!aliases) {
-    console.log('[DEBUG] No aliases found, returning empty array');
     return [];
   }
 
-  // If it's already an array, return it
   if (Array.isArray(aliases)) {
-    console.log('[DEBUG] Already an array:', JSON.stringify(aliases));
-    return aliases as string[];
+    return aliases
+      .filter((alias): alias is string => typeof alias === 'string')
+      .map((alias) => alias.trim())
+      .filter(Boolean);
   }
 
-  // If it's a string, try to parse as JSON
   if (typeof aliases === 'string') {
     try {
       const parsed = JSON.parse(aliases);
-      console.log('[DEBUG] Parsed JSON string:', JSON.stringify(parsed));
-      return Array.isArray(parsed) ? parsed : [aliases];
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((alias): alias is string => typeof alias === 'string')
+          .map((alias) => alias.trim())
+          .filter(Boolean);
+      }
+      return aliases.trim() ? [aliases.trim()] : [];
     } catch {
-      // Not valid JSON, treat as single alias
-      console.log('[DEBUG] Not valid JSON, treating as single alias:', aliases);
-      return [aliases];
+      return aliases.trim() ? [aliases.trim()] : [];
     }
   }
 
-  console.log('[DEBUG] Unknown format, returning empty array');
+  return [];
+}
+
+function getPartnerAliases(partner: Partner): string[] {
+  const candidateFields: unknown[] = [
+    partner.stripe_aliases,
+    (partner as unknown as { stripe_alias?: unknown }).stripe_alias,
+    (partner as unknown as { aliases?: unknown }).aliases,
+  ];
+
+  for (const field of candidateFields) {
+    const parsed = parseStripeAliases(field);
+    if (parsed.length > 0) return parsed;
+  }
+
   return [];
 }
 
@@ -377,60 +390,67 @@ function parseStripeAliases(aliases: unknown): string[] {
  */
 export function findMatchingPartner(
   merchantName: string,
-  partners: Partner[]
+  partners: Partner[],
+  debug = false
 ): Partner | null {
   const normalisedMerchant = merchantName.toUpperCase().trim();
-  const isAddisonRelated = normalisedMerchant.includes('ADDISON');
-  
-  if (isAddisonRelated) {
-    console.log('[DEBUG-ADDISON] ==========================================');
-    console.log('[DEBUG-ADDISON] Looking for match for merchant:', merchantName);
-    console.log('[DEBUG-ADDISON] Normalised merchant:', normalisedMerchant);
-    console.log('[DEBUG-ADDISON] Total partners to check:', partners.length);
+
+  const merchantCandidates = Array.from(
+    new Set(
+      [
+        normalisedMerchant,
+        normalisedMerchant.replace(/^SP\s+/, '').trim(),
+        normalisedMerchant.replace(/^SQ\s+\*\s*/, '').trim(),
+      ].filter(Boolean)
+    )
+  );
+
+  if (debug) {
+    console.log('[UPLOAD-MATCH] ------------------------------------------');
+    console.log('[UPLOAD-MATCH] Merchant raw:', merchantName);
+    console.log('[UPLOAD-MATCH] Merchant candidates:', merchantCandidates);
+    console.log('[UPLOAD-MATCH] Total partners to check:', partners.length);
   }
 
   for (const partner of partners) {
-    const aliases = parseStripeAliases(partner.stripe_aliases);
+    const aliases = getPartnerAliases(partner);
     const partnerName = partner.partner_name || (partner as unknown as { name?: string }).name || 'Unknown';
-    
-    // Special logging for Addison Lee
-    if (partnerName.toUpperCase().includes('ADDISON LEE')) {
-      console.log('[DEBUG-ADDISON] Partner object:', JSON.stringify({
-        name: partnerName,
-        stripe_aliases: partner.stripe_aliases,
-        aliasType: typeof partner.stripe_aliases,
-        parsedAliases: aliases
-      }, null, 2));
-    }
-    
-    if (isAddisonRelated && aliases.length > 0) {
-      console.log(`[DEBUG-ADDISON] Partner "${partnerName}" has aliases:`, JSON.stringify(aliases));
-    }
 
     for (const alias of aliases) {
       const normalisedAlias = alias.toUpperCase().trim();
-      
-      if (isAddisonRelated) {
-        console.log(`[DEBUG-ADDISON] Comparing: "${normalisedMerchant}" startsWith("${normalisedAlias}") = ${normalisedMerchant.startsWith(normalisedAlias)}`);
-        console.log(`[DEBUG-ADDISON] Comparing: "${normalisedMerchant}" includes("${normalisedAlias}") = ${normalisedMerchant.includes(normalisedAlias)}`);
-      }
-      
-      if (
-        normalisedMerchant.startsWith(normalisedAlias) ||
-        normalisedMerchant.includes(normalisedAlias)
-      ) {
-        if (isAddisonRelated) {
-          console.log(`[DEBUG-ADDISON] ✓✓✓ MATCHED! "${merchantName}" → "${partnerName}" via alias "${alias}"`);
-          console.log('[DEBUG-ADDISON] ==========================================');
+      const wildcardTrimmedAlias = normalisedAlias.replace(/\*.*$/, '').trim();
+      const aliasCandidates = Array.from(
+        new Set([normalisedAlias, wildcardTrimmedAlias].filter(Boolean))
+      );
+
+      for (const merchantCandidate of merchantCandidates) {
+        for (const aliasCandidate of aliasCandidates) {
+          const startsWith = merchantCandidate.startsWith(aliasCandidate);
+          const includes = merchantCandidate.includes(aliasCandidate);
+
+          if (debug) {
+            console.log(
+              `[UPLOAD-MATCH] Compare partner="${partnerName}" merchant="${merchantCandidate}" alias="${aliasCandidate}" startsWith=${startsWith} includes=${includes}`
+            );
+          }
+
+          if (startsWith || includes) {
+            if (debug) {
+              console.log(
+                `[UPLOAD-MATCH] MATCH merchant="${merchantName}" -> partner="${partnerName}" via alias="${alias}"`
+              );
+              console.log('[UPLOAD-MATCH] ------------------------------------------');
+            }
+            return partner;
+          }
         }
-        return partner;
       }
     }
   }
 
-  if (isAddisonRelated) {
-    console.log(`[DEBUG-ADDISON] ✗✗✗ No match found for "${merchantName}"`);
-    console.log('[DEBUG-ADDISON] ==========================================');
+  if (debug) {
+    console.log(`[UPLOAD-MATCH] NO MATCH for merchant="${merchantName}"`);
+    console.log('[UPLOAD-MATCH] ------------------------------------------');
   }
   return null;
 }

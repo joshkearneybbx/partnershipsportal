@@ -306,7 +306,8 @@ function UploadModal({
     const unmatched: string[] = [];
     
     for (const merchant of uniqueMerchants) {
-      const matchedPartner = findMatchingPartner(merchant, signedPartners);
+      const normalisedMerchant = normaliseMerchant(merchant);
+      const matchedPartner = findMatchingPartner(normalisedMerchant, signedPartners);
       if (matchedPartner) {
         exactMatches.add(merchant);
       } else {
@@ -358,6 +359,25 @@ function UploadModal({
       
       // Build a map of merchant name -> partner for quick lookup
       const merchantToPartnerMap = new Map<string, Partner>();
+
+      const partnersWithAliases = signedPartners.filter((partner) => {
+        const candidateFields: unknown[] = [
+          partner.stripe_aliases,
+          (partner as unknown as { stripe_alias?: unknown }).stripe_alias,
+          (partner as unknown as { aliases?: unknown }).aliases,
+        ];
+
+        return candidateFields.some((field) => {
+          if (Array.isArray(field)) return field.length > 0;
+          if (typeof field === 'string') return field.trim().length > 0;
+          return false;
+        });
+      });
+
+      console.log(
+        '[UPLOAD-MATCH] Signed partners with non-empty alias fields:',
+        `${partnersWithAliases.length}/${signedPartners.length}`
+      );
       
       // Add confirmed fuzzy matches
       for (const match of confirmedMatches) {
@@ -395,6 +415,15 @@ function UploadModal({
         totalSpend += amount;
 
         const normalisedName = normaliseMerchant(row.merchantName);
+        if (i < 5) {
+          console.log(
+            `[UPLOAD-MATCH] Tx ${i + 1} normalised merchant:`,
+            JSON.stringify({
+              raw: row.merchantName,
+              normalised: normalisedName,
+            })
+          );
+        }
         let parsedDate: string;
         try {
           parsedDate = parseDate(row.date);
@@ -408,12 +437,26 @@ function UploadModal({
         
         if (!matchedPartner) {
           // Try exact alias matching (only against signed partners)
-          matchedPartner = findMatchingPartner(row.merchantName, signedPartners) || undefined;
+          matchedPartner = findMatchingPartner(normalisedName, signedPartners, i < 5) || undefined;
         }
 
         let matchedPartnerId: string | undefined;
-        if (matchedPartner && isTransactionEligibleForPartner(parsedDate, matchedPartner)) {
-          matchedPartnerId = matchedPartner.id;
+        if (matchedPartner) {
+          const eligibleForAttribution = isTransactionEligibleForPartner(parsedDate, matchedPartner);
+          if (eligibleForAttribution) {
+            matchedPartnerId = matchedPartner.id;
+          } else if (i < 5) {
+            console.log(
+              '[UPLOAD-MATCH] Alias matched but not eligible for attribution:',
+              JSON.stringify({
+                merchant: row.merchantName,
+                partner: matchedPartner.partner_name,
+                partnerStatus: matchedPartner.status,
+                partnerSignedAt: matchedPartner.signed_at,
+                transactionDate: parsedDate,
+              })
+            );
+          }
         }
 
         if (matchedPartnerId) {
