@@ -155,6 +155,13 @@ export function normaliseMerchant(raw: string): string {
   // Check each pattern group
   for (const group of merchantPatterns) {
     for (const pattern of group.patterns) {
+      if (group.displayName === 'EE' && pattern === 'EE') {
+        if (normalised === 'EE' || normalised.startsWith('EE *')) {
+          return group.displayName;
+        }
+        continue;
+      }
+
       if (normalised.startsWith(pattern) || normalised.includes(pattern)) {
         return group.displayName;
       }

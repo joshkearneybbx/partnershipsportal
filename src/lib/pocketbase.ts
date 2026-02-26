@@ -155,6 +155,9 @@ export const updatePartnerStatus = async (
   currentStatus?: string
 ): Promise<Partner | null> => {
   try {
+    const existingRecord = await pb.collection(COLLECTION_NAME).getOne(id);
+    const existingPartner = existingRecord as unknown as Partner;
+
     const updates: Partial<Partner> = {
       status: newStatus as Partner['status'],
     };
@@ -164,8 +167,8 @@ export const updatePartnerStatus = async (
       updates.lead_date = new Date().toISOString();
     }
 
-    // If moving to signed, record the signed_at timestamp
-    if (newStatus === 'signed') {
+    // If moving to signed, record signed_at only when it's missing
+    if (newStatus === 'signed' && !existingPartner.signed_at) {
       updates.signed_at = new Date().toISOString();
     }
 

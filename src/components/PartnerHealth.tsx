@@ -48,6 +48,7 @@ import {
   createPartnerFromMerchant,
   appendPartnerAlias,
   assignMerchantToPartner,
+  isTransactionEligibleForPartner,
   deleteTransactionsForUpload,
   deleteUpload,
   getUploadForMonth,
@@ -355,12 +356,12 @@ function UploadModal({
       // Get confirmed matches
       const confirmedMatches = proposedMatches.filter(m => m.confirmed === true);
       
-      // Build a map of merchant name -> partner ID for quick lookup
-      const merchantToPartnerMap = new Map<string, string>();
+      // Build a map of merchant name -> partner for quick lookup
+      const merchantToPartnerMap = new Map<string, Partner>();
       
       // Add confirmed fuzzy matches
       for (const match of confirmedMatches) {
-        merchantToPartnerMap.set(match.merchantName, match.partner.id);
+        merchantToPartnerMap.set(match.merchantName, match.partner);
         
         // Save the alias to the partner
         try {
@@ -394,33 +395,38 @@ function UploadModal({
         totalSpend += amount;
 
         const normalisedName = normaliseMerchant(row.merchantName);
+        let parsedDate: string;
+        try {
+          parsedDate = parseDate(row.date);
+        } catch (err) {
+          console.error(`[DEBUG] Failed to parse row ${i}:`, row, err);
+          continue;
+        }
         
         // Check for exact match first
-        let matchedPartnerId = merchantToPartnerMap.get(row.merchantName);
+        let matchedPartner: Partner | undefined = merchantToPartnerMap.get(row.merchantName);
         
-        if (!matchedPartnerId) {
+        if (!matchedPartner) {
           // Try exact alias matching (only against signed partners)
-          const matchedPartner = findMatchingPartner(row.merchantName, signedPartners);
-          if (matchedPartner) {
-            matchedPartnerId = matchedPartner.id;
-          }
+          matchedPartner = findMatchingPartner(row.merchantName, signedPartners) || undefined;
+        }
+
+        let matchedPartnerId: string | undefined;
+        if (matchedPartner && isTransactionEligibleForPartner(parsedDate, matchedPartner)) {
+          matchedPartnerId = matchedPartner.id;
         }
 
         if (matchedPartnerId) {
           matchedCount++;
         }
 
-        try {
-          transactions.push({
-            date: parseDate(row.date),
-            merchant_raw: row.merchantName,
-            merchant_normalised: normalisedName,
-            amount,
-            partner_id: matchedPartnerId,
-          });
-        } catch (err) {
-          console.error(`[DEBUG] Failed to parse row ${i}:`, row, err);
-        }
+        transactions.push({
+          date: parsedDate,
+          merchant_raw: row.merchantName,
+          merchant_normalised: normalisedName,
+          amount,
+          partner_id: matchedPartnerId,
+        });
       }
 
       if (transactions.length === 0) {
@@ -1178,7 +1184,6 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
       console.log('[DEBUG] Suggested alias:', suggestedAlias);
       
       const result = await assignMerchantToPartner(
-        uploads[0].id,
         selectedMerchantForAssign.name,
         partnerId,
         suggestedAlias,

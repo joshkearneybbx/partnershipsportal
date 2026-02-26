@@ -9,6 +9,7 @@ import {
 } from '@/types/stripe';
 
 const POCKETBASE_URL = 'https://pocketbase.blckbx.co.uk';
+const warnedPartnersMissingSignedAt = new Set<string>();
 
 /**
  * Normalise merchant name for grouping and matching
@@ -62,7 +63,7 @@ export function normaliseMerchant(raw: string): string {
   if (name.match(/BRITISH GAS/)) return 'BRITISH GAS';
   if (name.match(/O2/)) return 'O2';
   if (name.match(/VODAFONE/)) return 'VODAFONE';
-  if (name.match(/EE/)) return 'EE';
+  if (name === 'EE' || name.startsWith('EE *')) return 'EE';
   if (name.match(/SKY/)) return 'SKY';
   if (name.match(/VIRGIN MEDIA/)) return 'VIRGIN MEDIA';
 
@@ -190,6 +191,45 @@ export function parseCommission(commissionStr: string): number {
   const clean = commissionStr.replace('%', '').trim();
   const value = parseFloat(clean);
   return isNaN(value) ? 0 : value;
+}
+
+function getDateKey(value: string | Date): string | null {
+  const date = value instanceof Date ? value : new Date(value);
+  if (isNaN(date.getTime())) return null;
+  return date.toISOString().split('T')[0];
+}
+
+/**
+ * Returns true when a transaction should be attributed to the partner.
+ * Attribution is only valid for signed partners and tx dates on/after signed_at.
+ */
+export function isTransactionEligibleForPartner(
+  transactionDate: string | Date,
+  partner: Partner
+): boolean {
+  if (partner.status !== 'signed') return false;
+
+  if (!partner.signed_at) {
+    if (!warnedPartnersMissingSignedAt.has(partner.id)) {
+      warnedPartnersMissingSignedAt.add(partner.id);
+      console.warn(
+        `[Partner Attribution] Signed partner "${partner.partner_name}" (${partner.id}) has no signed_at. Skipping attribution.`
+      );
+    }
+    return false;
+  }
+
+  const transactionDateKey = getDateKey(transactionDate);
+  const signedDateKey = getDateKey(partner.signed_at);
+
+  if (!transactionDateKey || !signedDateKey) {
+    console.warn(
+      `[Partner Attribution] Invalid date detected for partner "${partner.partner_name}" (${partner.id}).`
+    );
+    return false;
+  }
+
+  return transactionDateKey >= signedDateKey;
 }
 
 /**
@@ -409,7 +449,7 @@ export function getWeeklyData(transactions: ProcessedTransaction[]): WeeklyReven
   const weekMap = new Map<string, { revenue: number; commission: number }>();
 
   for (const tx of transactions) {
-    if (tx.partnerId && tx.partner) {
+    if (tx.partnerId && tx.partner && isTransactionEligibleForPartner(tx.date, tx.partner)) {
       const date = new Date(tx.date);
       const weekStart = new Date(date);
       weekStart.setDate(date.getDate() - date.getDay()); // Sunday
@@ -458,7 +498,10 @@ export function processPartnerRevenue(
   for (const tx of transactions) {
     if (tx.isHidden) continue;
 
-    if (tx.partnerId && tx.partner) {
+    const shouldCountAsPartner =
+      tx.partnerId && tx.partner && isTransactionEligibleForPartner(tx.date, tx.partner);
+
+    if (shouldCountAsPartner && tx.partnerId && tx.partner) {
       totalRevenue += tx.amount;
 
       const commissionRate = parseCommission(tx.partner.commission);
@@ -669,7 +712,7 @@ export async function createTransaction(
     merchant_raw: string;
     merchant_normalised: string;
     amount: number;
-    partner_id?: string;
+    partner_id?: string | null;
     category?: string;
     is_hidden?: boolean;
   },
@@ -704,7 +747,7 @@ export async function batchCreateTransactions(
     merchant_raw: string;
     merchant_normalised: string;
     amount: number;
-    partner_id?: string;
+    partner_id?: string | null;
     category?: string;
     is_hidden?: boolean;
   }>,
@@ -739,7 +782,7 @@ export async function batchCreateTransactions(
  */
 export async function updateTransaction(
   id: string,
-  updates: { is_hidden?: boolean; category?: string; partner_id?: string },
+  updates: { is_hidden?: boolean; category?: string; partner_id?: string | null },
   authToken: string
 ): Promise<StripeTransaction> {
   const response = await fetch(
@@ -887,25 +930,35 @@ export async function getUploadForMonth(
  * Adds alias to partner and updates all transactions
  */
 export async function assignMerchantToPartner(
-  uploadId: string,
   merchantName: string,
   partnerId: string,
   suggestedAlias: string,
   authToken: string
 ): Promise<{ updatedTransactions: number; updatedPartner: Partner }> {
-  console.log('[DEBUG] assignMerchantToPartner called:', { uploadId, merchantName, partnerId, suggestedAlias });
+  console.log('[DEBUG] assignMerchantToPartner called:', { merchantName, partnerId, suggestedAlias });
   
   // First, append the alias to the partner
   const updatedPartner = await appendPartnerAlias(partnerId, suggestedAlias, authToken);
   console.log('[DEBUG] Partner updated successfully:', updatedPartner.partner_name);
 
-  // IMPORTANT: Use merchant_raw for matching, not merchant_normalised
-  // The merchantName from discovery is the normalised name, but we need to match against raw names
-  // Fetch all transactions for this upload first
-  console.log('[DEBUG] Fetching all transactions for upload:', uploadId);
-  
+  // Guard against invalid partner state
+  if (updatedPartner.status !== 'signed') {
+    throw new Error(`Cannot link merchant to non-signed partner: ${updatedPartner.partner_name}`);
+  }
+  if (!updatedPartner.signed_at) {
+    console.warn(
+      `[Partner Attribution] Signed partner "${updatedPartner.partner_name}" (${updatedPartner.id}) has no signed_at. No transactions linked.`
+    );
+    return {
+      updatedTransactions: 0,
+      updatedPartner,
+    };
+  }
+
+  // Fetch all transactions with this merchant normalised name across all uploads
+  const filter = encodeURIComponent(`merchant_normalised="${merchantName}"`);
   const allTxResponse = await fetch(
-    `${POCKETBASE_URL}/api/collections/stripe_transactions/records?filter=upload_id="${uploadId}"&perPage=1000`,
+    `${POCKETBASE_URL}/api/collections/stripe_transactions/records?filter=${filter}&perPage=1000`,
     {
       headers: {
         Authorization: authToken,
@@ -919,35 +972,79 @@ export async function assignMerchantToPartner(
   
   const allData = await allTxResponse.json();
   const allTransactions = allData.items as StripeTransaction[];
-  console.log('[DEBUG] Total transactions in upload:', allTransactions.length);
+  console.log('[DEBUG] Total transactions for merchant:', merchantName, allTransactions.length);
   
-  // Filter to find transactions where merchant_normalised matches
-  // The merchantName from discovery is already normalised
-  const matchingTransactions = allTransactions.filter(tx => 
-    tx.merchant_normalised.toUpperCase() === merchantName.toUpperCase()
-  );
-  
-  console.log('[DEBUG] Matching transactions for merchant:', merchantName, matchingTransactions.length);
-  if (matchingTransactions.length > 0) {
+  if (allTransactions.length > 0) {
     console.log('[DEBUG] First match sample:', {
-      id: matchingTransactions[0].id,
-      merchantRaw: matchingTransactions[0].merchant_raw,
-      merchantNormalised: matchingTransactions[0].merchant_normalised
+      id: allTransactions[0].id,
+      merchantRaw: allTransactions[0].merchant_raw,
+      merchantNormalised: allTransactions[0].merchant_normalised
     });
   }
 
-  // Update all matching transactions to set partner_id and clear is_hidden
-  const updatePromises = matchingTransactions.map((tx) =>
-    updateTransaction(tx.id, { partner_id: partnerId, is_hidden: false }, authToken)
-  );
+  // Attribute only transactions on/after signed_at; pre-signed tx remain unmatched
+  let attributedCount = 0;
+  const updatePromises = allTransactions
+    .map((tx) => {
+      const shouldAttribute = isTransactionEligibleForPartner(tx.date, updatedPartner);
+      const nextPartnerId = shouldAttribute ? partnerId : null;
+
+      if (shouldAttribute && tx.partner_id !== partnerId) {
+        attributedCount++;
+      }
+
+      const shouldUpdatePartner = tx.partner_id !== nextPartnerId;
+      const shouldUnhide = shouldAttribute && tx.is_hidden;
+
+      if (!shouldUpdatePartner && !shouldUnhide) {
+        return null;
+      }
+
+      return updateTransaction(
+        tx.id,
+        { partner_id: nextPartnerId, ...(shouldUnhide ? { is_hidden: false } : {}) },
+        authToken
+      );
+    })
+    .filter((promise): promise is Promise<StripeTransaction> => promise !== null);
 
   await Promise.all(updatePromises);
-  console.log('[DEBUG] Updated', matchingTransactions.length, 'transactions');
+  console.log('[DEBUG] Updated', updatePromises.length, 'transactions. Attributed:', attributedCount);
 
   return {
-    updatedTransactions: matchingTransactions.length,
+    updatedTransactions: attributedCount,
     updatedPartner,
   };
+}
+
+/**
+ * Unlink a merchant from any partner by clearing partner_id for all merchant transactions.
+ */
+export async function unlinkMerchantFromPartner(
+  merchantName: string,
+  authToken: string
+): Promise<number> {
+  const filter = encodeURIComponent(`merchant_normalised="${merchantName}"`);
+  const response = await fetch(
+    `${POCKETBASE_URL}/api/collections/stripe_transactions/records?filter=${filter}&perPage=1000`,
+    {
+      headers: {
+        Authorization: authToken,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch transactions for unlink');
+  }
+
+  const data = await response.json();
+  const transactions = (data.items as StripeTransaction[]).filter((tx) => tx.partner_id !== null);
+  await Promise.all(
+    transactions.map((tx) => updateTransaction(tx.id, { partner_id: null }, authToken))
+  );
+
+  return transactions.length;
 }
 
 /**
