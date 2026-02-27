@@ -63,6 +63,7 @@ interface PartnerHealthProps {
 }
 
 type SubTab = 'overview' | 'discovery' | 'invoice-tracker';
+type InvoiceTrackerView = 'pending' | 'history';
 
 const RAG_COLORS = {
   green: '#1EA988',
@@ -991,6 +992,8 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [expandedInvoicePartner, setExpandedInvoicePartner] = useState<string | null>(null);
   const [updatingInvoicePartner, setUpdatingInvoicePartner] = useState<string | null>(null);
+  const [invoiceTrackerView, setInvoiceTrackerView] = useState<InvoiceTrackerView>('pending');
+  const [commissionInvoicedOverrides, setCommissionInvoicedOverrides] = useState<Record<string, boolean>>({});
 
   // Filter to only signed partners for matching
   const signedPartners = useMemo(() => 
@@ -1312,6 +1315,21 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
       }
     >();
 
+    for (const stats of partnerStats.values()) {
+      const partnerName = (stats.partner.partner_name || 'Unknown Partner').trim() || 'Unknown Partner';
+      grouped.set(partnerName, {
+        partnerName,
+        purchases: [],
+        totalPurchases: stats.transactionCount,
+        totalAmount: stats.totalRevenue,
+        commissionValue: (stats.partner.commission || '').trim(),
+        partnerIds: [stats.partner.id],
+        hasCommissionSource: typeof stats.partner.commission === 'string' && stats.partner.commission.trim() !== '',
+        hasBigPurchaseSource: false,
+        invoiced: !!stats.partner.commission_invoiced,
+      });
+    }
+
     for (const purchase of bigPurchases) {
       const partnerName = (purchase.partner_name || 'Unknown Partner').trim() || 'Unknown Partner';
       const existing = grouped.get(partnerName);
@@ -1336,33 +1354,17 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
       }
     }
 
-    const commissionPartners = partners.filter(
-      (partner) => typeof partner.commission === 'string' && partner.commission.trim() !== ''
-    );
-
-    for (const partner of commissionPartners) {
+    for (const partner of partners) {
       const partnerName = (partner.partner_name || 'Unknown Partner').trim() || 'Unknown Partner';
-      const commissionValue = partner.commission.trim();
+      const commissionValue = typeof partner.commission === 'string' ? partner.commission.trim() : '';
       const existing = grouped.get(partnerName);
 
       if (existing) {
-        existing.hasCommissionSource = true;
+        existing.hasCommissionSource = existing.hasCommissionSource || commissionValue !== '';
         existing.commissionValue = existing.commissionValue || commissionValue;
         if (!existing.partnerIds.includes(partner.id)) {
           existing.partnerIds.push(partner.id);
         }
-      } else {
-        grouped.set(partnerName, {
-          partnerName,
-          purchases: [],
-          totalPurchases: 0,
-          totalAmount: 0,
-          commissionValue,
-          partnerIds: [partner.id],
-          hasCommissionSource: true,
-          hasBigPurchaseSource: false,
-          invoiced: !!partner.commission_invoiced,
-        });
       }
     }
 
@@ -1371,11 +1373,30 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
       purchases: [...group.purchases].sort((a, b) => new Date(b.purchase_date).getTime() - new Date(a.purchase_date).getTime()),
       invoiced:
         (group.purchases.length === 0 || group.purchases.every((purchase) => !!purchase.invoiced)) &&
-        (group.partnerIds.length === 0 || group.partnerIds.every((partnerId) => !!partnerMap.get(partnerId)?.commission_invoiced)),
+        (group.partnerIds.length === 0 ||
+          group.partnerIds.every((partnerId) =>
+            partnerId in commissionInvoicedOverrides
+              ? commissionInvoicedOverrides[partnerId]
+              : !!partnerMap.get(partnerId)?.commission_invoiced
+          )),
     }));
 
-    return result.sort((a, b) => b.totalAmount - a.totalAmount);
-  }, [bigPurchases, getPurchaseAmountDue, partnerMap, partners]);
+    return result
+      .filter((group) => group.totalPurchases > 0)
+      .sort((a, b) => b.totalAmount - a.totalAmount);
+  }, [bigPurchases, commissionInvoicedOverrides, getPurchaseAmountDue, partnerMap, partnerStats, partners]);
+
+  const pendingInvoicePartners = useMemo(
+    () => invoicePartners.filter((group) => !group.invoiced),
+    [invoicePartners]
+  );
+
+  const invoiceHistoryPartners = useMemo(
+    () => invoicePartners.filter((group) => group.invoiced),
+    [invoicePartners]
+  );
+
+  const visibleInvoicePartners = invoiceTrackerView === 'pending' ? pendingInvoicePartners : invoiceHistoryPartners;
 
   const invoicedByPartnerId = useMemo(() => {
     const map = new Map<string, boolean>();
@@ -1388,12 +1409,15 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
           purchase.partner_id === partner.id
       );
       const purchasesInvoiced = relatedPurchases.length > 0 && relatedPurchases.every((purchase) => !!purchase.invoiced);
-      const commissionInvoiced = !!partner.commission_invoiced;
+      const commissionInvoiced =
+        partner.id in commissionInvoicedOverrides
+          ? commissionInvoicedOverrides[partner.id]
+          : !!partner.commission_invoiced;
       map.set(partner.id, purchasesInvoiced || commissionInvoiced);
     }
 
     return map;
-  }, [bigPurchases, partners]);
+  }, [bigPurchases, commissionInvoicedOverrides, partners]);
 
   const handlePartnerInvoicedToggle = useCallback(
     async (
@@ -1436,6 +1460,15 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
         );
 
         await Promise.all([...purchaseUpdates, ...commissionUpdates]);
+        if (partnerIds.length > 0) {
+          setCommissionInvoicedOverrides((current) => {
+            const next = { ...current };
+            for (const partnerId of partnerIds) {
+              next[partnerId] = checked;
+            }
+            return next;
+          });
+        }
         showSuccess(`Updated invoiced status for ${partnerName}`);
         await loadData();
       } catch (error) {
@@ -1673,7 +1706,37 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
           <div className="bg-white rounded-2xl shadow-sm border border-blckbx-dark-sand overflow-hidden">
             <div className="p-4 border-b border-blckbx-dark-sand flex items-center justify-between">
               <h3 className="font-display text-xl font-semibold text-blckbx-black">Invoice Tracker</h3>
-              <span className="text-sm text-blckbx-black/60">{invoicePartners.length} partners</span>
+              <div className="flex items-center gap-4">
+                <div className="inline-flex rounded-lg border border-blckbx-dark-sand overflow-hidden">
+                  <button
+                    onClick={() => {
+                      setInvoiceTrackerView('pending');
+                      setExpandedInvoicePartner(null);
+                    }}
+                    className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                      invoiceTrackerView === 'pending'
+                        ? 'bg-blckbx-cta/20 text-blckbx-black'
+                        : 'bg-white text-blckbx-black/60 hover:text-blckbx-black'
+                    }`}
+                  >
+                    Pending
+                  </button>
+                  <button
+                    onClick={() => {
+                      setInvoiceTrackerView('history');
+                      setExpandedInvoicePartner(null);
+                    }}
+                    className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-blckbx-dark-sand ${
+                      invoiceTrackerView === 'history'
+                        ? 'bg-blckbx-cta/20 text-blckbx-black'
+                        : 'bg-white text-blckbx-black/60 hover:text-blckbx-black'
+                    }`}
+                  >
+                    History
+                  </button>
+                </div>
+                <span className="text-sm text-blckbx-black/60">{visibleInvoicePartners.length} partners</span>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -1687,7 +1750,7 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {invoicePartners.map((group, index) => (
+                  {visibleInvoicePartners.map((group, index) => (
                     <Fragment key={group.partnerName}>
                       <motion.tr
                         key={group.partnerName}
@@ -1760,21 +1823,58 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
                           >
                             <td colSpan={5} className="p-4">
                               <div className="space-y-3">
-                                {group.hasCommissionSource && group.commissionValue && (
-                                  <div className="bg-white rounded-lg border border-blckbx-dark-sand p-4">
-                                    <div className="flex items-center justify-between">
-                                      <div>
-                                        <p className="text-xs text-blckbx-black/50">Commission Value</p>
-                                        <p className="text-sm font-medium text-blckbx-black">{group.commissionValue}</p>
+                                {(() => {
+                                  const linkedPartners = group.partnerIds
+                                    .map((partnerId) => partnerMap.get(partnerId))
+                                    .filter((partner): partner is Partner => !!partner);
+                                  const contactPartner =
+                                    linkedPartners.find(
+                                      (partner) =>
+                                        !!partner.contact_name ||
+                                        !!partner.contact_email ||
+                                        !!partner.contact_phone ||
+                                        !!partner.contact_position
+                                    ) || linkedPartners[0];
+                                  const fallbackPoc = group.purchases[0]?.poc || '-';
+
+                                  return (
+                                    <div className="bg-white rounded-lg border border-blckbx-dark-sand p-4">
+                                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                        <div>
+                                          <p className="text-xs text-blckbx-black/50">Contact Name</p>
+                                          <p className="text-sm font-medium text-blckbx-black">
+                                            {contactPartner?.contact_name || fallbackPoc}
+                                          </p>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs text-blckbx-black/50">Position</p>
+                                          <p className="text-sm text-blckbx-black">
+                                            {contactPartner?.contact_position || '-'}
+                                          </p>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs text-blckbx-black/50">Email</p>
+                                          {contactPartner?.contact_email ? (
+                                            <a
+                                              href={`mailto:${contactPartner.contact_email}`}
+                                              className="text-sm text-blckbx-cta hover:underline break-all"
+                                            >
+                                              {contactPartner.contact_email}
+                                            </a>
+                                          ) : (
+                                            <p className="text-sm text-blckbx-black">-</p>
+                                          )}
+                                        </div>
+                                        <div>
+                                          <p className="text-xs text-blckbx-black/50">Phone</p>
+                                          <p className="text-sm text-blckbx-black">
+                                            {contactPartner?.contact_phone || '-'}
+                                          </p>
+                                        </div>
                                       </div>
-                                      {group.partnerIds.length > 0 && (
-                                        <span className="text-xs text-blckbx-black/50">
-                                          {group.partnerIds.length} commission partner{group.partnerIds.length > 1 ? 's' : ''}
-                                        </span>
-                                      )}
                                     </div>
-                                  </div>
-                                )}
+                                  );
+                                })()}
                                 {group.purchases.map((purchase) => (
                                   <div key={purchase.id} className="bg-white rounded-lg border border-blckbx-dark-sand p-4">
                                     <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
@@ -1826,9 +1926,11 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
                   ))}
                 </tbody>
               </table>
-              {invoicePartners.length === 0 && (
+              {visibleInvoicePartners.length === 0 && (
                 <div className="text-center py-12 text-blckbx-black/50">
-                  No big purchases available for invoice tracking yet
+                  {invoiceTrackerView === 'pending'
+                    ? 'No partners with uninvoiced matched transactions yet'
+                    : 'No invoiced partners in history yet'}
                 </div>
               )}
             </div>
