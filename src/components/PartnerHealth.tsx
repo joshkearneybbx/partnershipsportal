@@ -1299,6 +1299,10 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
     return Number(purchase.estimated_amount) || 0;
   }, []);
 
+  const getTransactionRevenuePounds = useCallback((amountInPence: number): number => {
+    return (Number(amountInPence) || 0) / 100;
+  }, []);
+
   const invoicePartners = useMemo(() => {
     const grouped = new Map<
       string,
@@ -1321,7 +1325,7 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
         partnerName,
         purchases: [],
         totalPurchases: stats.transactionCount,
-        totalAmount: stats.totalRevenue,
+        totalAmount: getTransactionRevenuePounds(stats.totalRevenue),
         commissionValue: (stats.partner.commission || '').trim(),
         partnerIds: [stats.partner.id],
         hasCommissionSource: typeof stats.partner.commission === 'string' && stats.partner.commission.trim() !== '',
@@ -1384,7 +1388,7 @@ export default function PartnerHealth({ partners }: PartnerHealthProps) {
     return result
       .filter((group) => group.totalPurchases > 0)
       .sort((a, b) => b.totalAmount - a.totalAmount);
-  }, [bigPurchases, commissionInvoicedOverrides, getPurchaseAmountDue, partnerMap, partnerStats, partners]);
+  }, [bigPurchases, commissionInvoicedOverrides, getPurchaseAmountDue, getTransactionRevenuePounds, partnerMap, partnerStats, partners]);
 
   const pendingInvoicePartners = useMemo(
     () => invoicePartners.filter((group) => !group.invoiced),

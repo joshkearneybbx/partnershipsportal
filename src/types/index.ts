@@ -36,6 +36,7 @@ export type LifestyleCategory =
 
 export type BigPurchaseStatus = 'flagged' | 'purchased';
 export type BigPurchaseCategory = 'Hotel' | 'Restaurant' | 'Wellness' | 'Retail' | 'Travel' | 'Gifting' | 'Other';
+export type BigPurchasePriority = 'Low' | 'Medium' | 'High' | 'Urgent';
 
 export interface Partner {
   id: string;
@@ -92,6 +93,8 @@ export interface BigPurchase {
   estimated_amount: number;
   amount_to_invoice: number | null;
   purchase_date: string;
+  need_by?: string | null;
+  priority?: BigPurchasePriority | null;
   category: BigPurchaseCategory;
   commission_notes: string;
   status: BigPurchaseStatus;

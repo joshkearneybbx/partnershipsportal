@@ -21,7 +21,7 @@ interface SidebarProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
   pipelineStats: PipelineStats;
-  bigPurchasesPurchasedCount: number;
+  bigPurchasesCount: number;
   onExpandedChange?: (expanded: boolean) => void;
 }
 
@@ -122,7 +122,7 @@ export default function Sidebar({
   activeTab,
   setActiveTab,
   pipelineStats,
-  bigPurchasesPurchasedCount,
+  bigPurchasesCount,
   onExpandedChange,
 }: SidebarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -155,7 +155,7 @@ export default function Sidebar({
       case 'all':
         return pipelineStats.total; // Show all partners including potential
       case 'big-purchases':
-        return bigPurchasesPurchasedCount;
+        return bigPurchasesCount;
       default:
         return undefined;
     }

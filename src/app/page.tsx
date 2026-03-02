@@ -312,7 +312,7 @@ export default function Home() {
     setEditPartner(null);
   };
 
-  const purchasedBigPurchasesCount = bigPurchases.filter((purchase) => purchase.status === 'purchased').length;
+  const bigPurchasesCount = bigPurchases.length;
 
   // Show loading state while checking auth
   if (authLoading) {
@@ -337,7 +337,7 @@ export default function Home() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         pipelineStats={pipelineStats}
-        bigPurchasesPurchasedCount={purchasedBigPurchasesCount}
+        bigPurchasesCount={bigPurchasesCount}
         onExpandedChange={setSidebarExpanded}
       />
 

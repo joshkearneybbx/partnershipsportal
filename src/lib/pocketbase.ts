@@ -305,6 +305,7 @@ export const getBigPurchases = async (): Promise<BigPurchase[]> => {
   try {
     const records = await pb.collection(BIG_PURCHASES_COLLECTION).getFullList({
       sort: '-created',
+      fields: 'id,partner_name,poc,estimated_amount,amount_to_invoice,purchase_date,need_by,priority,category,commission_notes,status,invoiced,partner_id,moved_to_potential,created,updated',
     });
     return records as unknown as BigPurchase[];
   } catch (error) {

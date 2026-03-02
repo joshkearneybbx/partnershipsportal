@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
-import { BigPurchase, BigPurchaseCategory, BigPurchaseStatus, Partner } from '@/types';
+import { BigPurchase, BigPurchaseCategory, BigPurchasePriority, BigPurchaseStatus, Partner } from '@/types';
 
 type StatusFilter = 'all' | BigPurchaseStatus;
 
@@ -26,6 +26,7 @@ const categoryOptions: BigPurchaseCategory[] = [
 ];
 
 const statusOptions: BigPurchaseStatus[] = ['flagged', 'purchased'];
+const priorityOptions: BigPurchasePriority[] = ['Low', 'Medium', 'High', 'Urgent'];
 
 const getCategoryBadgeStyle = (category: BigPurchaseCategory): string => {
   switch (category) {
@@ -43,6 +44,36 @@ const getCategoryBadgeStyle = (category: BigPurchaseCategory): string => {
       return 'bg-pink-100 text-pink-700';
     default:
       return 'bg-blckbx-dark-sand text-blckbx-black/70';
+  }
+};
+
+const normalizePriority = (priority?: string | null): BigPurchasePriority | null => {
+  switch ((priority || '').toLowerCase()) {
+    case 'low':
+      return 'Low';
+    case 'medium':
+      return 'Medium';
+    case 'high':
+      return 'High';
+    case 'urgent':
+      return 'Urgent';
+    default:
+      return null;
+  }
+};
+
+const getPriorityBadgeStyle = (priority: BigPurchasePriority): string => {
+  switch (priority) {
+    case 'Low':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'Medium':
+      return 'bg-orange-100 text-orange-800';
+    case 'High':
+      return 'bg-red-100 text-red-700';
+    case 'Urgent':
+      return 'bg-red-700 text-white';
+    default:
+      return '';
   }
 };
 
@@ -94,6 +125,8 @@ export default function BigPurchasesTable({
         poc: selectedPurchase.poc,
         amount_to_invoice: selectedPurchase.amount_to_invoice,
         purchase_date: selectedPurchase.purchase_date,
+        need_by: selectedPurchase.need_by,
+        priority: selectedPurchase.priority,
         category: selectedPurchase.category,
         commission_notes: selectedPurchase.commission_notes,
         status: selectedPurchase.status,
@@ -182,7 +215,9 @@ export default function BigPurchasesTable({
                 <th className="p-4 text-sm font-medium text-blckbx-black">Partner Name</th>
                 <th className="p-4 text-sm font-medium text-blckbx-black">POC</th>
                 <th className="p-4 text-sm font-medium text-blckbx-black">Amount</th>
-                <th className="p-4 text-sm font-medium text-blckbx-black">Purchase Date</th>
+                <th className="p-4 text-sm font-medium text-blckbx-black">Created Date</th>
+                <th className="p-4 text-sm font-medium text-blckbx-black">Need By</th>
+                <th className="p-4 text-sm font-medium text-blckbx-black">Priority</th>
                 <th className="p-4 text-sm font-medium text-blckbx-black">Category</th>
                 <th className="p-4 text-sm font-medium text-blckbx-black">Status</th>
                 <th className="p-4 text-sm font-medium text-blckbx-black text-center">Invoiced</th>
@@ -218,7 +253,20 @@ export default function BigPurchasesTable({
                     )}
                   </td>
                   <td className="p-4 text-sm text-blckbx-black/70">
-                    {purchase.purchase_date ? format(new Date(purchase.purchase_date), 'dd MMM yyyy') : '-'}
+                    {purchase.created ? format(new Date(purchase.created), 'dd MMM yyyy') : '-'}
+                  </td>
+                  <td className="p-4 text-sm text-blckbx-black/70">
+                    {purchase.need_by ? format(new Date(purchase.need_by), 'dd MMM yyyy') : '-'}
+                  </td>
+                  <td className="p-4 text-sm">
+                    {(() => {
+                      const priority = normalizePriority(purchase.priority);
+                      return priority ? (
+                        <span className={`px-2 py-1 rounded-full text-xs ${getPriorityBadgeStyle(priority)}`}>
+                          {priority}
+                        </span>
+                      ) : null;
+                    })()}
                   </td>
                   <td className="p-4 text-sm">
                     <span className={`px-2 py-1 rounded-full text-xs ${getCategoryBadgeStyle(purchase.category)}`}>
@@ -356,6 +404,47 @@ export default function BigPurchasesTable({
                         }
                         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-[#F5F3F0]"
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-[#F5F3F0] mb-1">Need By</label>
+                      <input
+                        type="date"
+                        value={selectedPurchase.need_by ? selectedPurchase.need_by.slice(0, 10) : ''}
+                        onChange={(event) =>
+                          setSelectedPurchase((prev) =>
+                            prev ? { ...prev, need_by: event.target.value || null } : prev
+                          )
+                        }
+                        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-[#F5F3F0]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-[#F5F3F0] mb-1">Priority</label>
+                      <select
+                        value={normalizePriority(selectedPurchase.priority) || ''}
+                        onChange={(event) =>
+                          setSelectedPurchase((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  priority: event.target.value
+                                    ? (event.target.value as BigPurchasePriority)
+                                    : null,
+                                }
+                              : prev
+                          )
+                        }
+                        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-[#F5F3F0]"
+                      >
+                        <option value="">None</option>
+                        {priorityOptions.map((priority) => (
+                          <option key={priority} value={priority}>
+                            {priority}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
                     <div>
