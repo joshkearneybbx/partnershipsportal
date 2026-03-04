@@ -207,7 +207,7 @@ export default function ConfirmPurchasePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1.5">Estimated Amount £</label>
+                <label className="block text-sm font-medium mb-1.5">Amount Paid £</label>
                 <input
                   type="number"
                   min="0"
