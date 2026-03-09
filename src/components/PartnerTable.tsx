@@ -364,9 +364,17 @@ export default function PartnerTable({
                       </td>
                       {/* Commission */}
                       <td className="p-3">
-                        <span className="text-sm text-blckbx-black/70 whitespace-nowrap">
-                          {partner.commission || '-'}
-                        </span>
+                        {partner.has_commission ? (
+                          partner.commission_rate && partner.commission_rate > 0 ? (
+                            <span className="text-sm text-blckbx-black/70 whitespace-nowrap">
+                              {partner.commission_rate}%
+                            </span>
+                          ) : (
+                            <span className="text-sm text-blckbx-black/70 whitespace-nowrap">Yes</span>
+                          )
+                        ) : (
+                          <span className="text-sm text-blckbx-black/40 whitespace-nowrap">—</span>
+                        )}
                       </td>
                       {/* Contact - Split columns for 'all' tab */}
                       {currentTab === 'all' ? (

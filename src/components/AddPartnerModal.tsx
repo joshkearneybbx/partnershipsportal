@@ -72,6 +72,8 @@ const getEmptyFormData = (defaultStatus: PartnerStatus) => ({
   when_not_to_use: '',
   sla_notes: '',
   commission: '',
+  commission_rate: 0,
+  has_commission: false,
   stripe_aliases: [] as string[],
   contacted: false,
   call_booked: false,
@@ -116,6 +118,8 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, onEdit, editPa
           when_not_to_use: editPartner.when_not_to_use || '',
           sla_notes: editPartner.sla_notes || '',
           commission: editPartner.commission || '',
+          commission_rate: editPartner.commission_rate ?? 0,
+          has_commission: editPartner.has_commission || (!!editPartner.commission && editPartner.commission.trim() !== ''),
           stripe_aliases: editPartner.stripe_aliases || [],
           contacted: editPartner.contacted || false,
           call_booked: editPartner.call_booked || false,
@@ -136,11 +140,20 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, onEdit, editPa
     setIsSubmitting(true);
 
     try {
+      // Prepare submission data
+      const submissionData = {
+        ...formData,
+        has_commission: formData.has_commission,
+        // Clear commission fields if has_commission is false
+        commission: formData.has_commission ? formData.commission : '',
+        commission_rate: formData.has_commission ? formData.commission_rate : 0,
+      };
+
       if (isEditMode && editPartner && onEdit) {
-        await onEdit(editPartner.id, formData);
+        await onEdit(editPartner.id, submissionData);
         showSuccess(`Partner "${formData.partner_name}" updated successfully`);
       } else {
-        await onAdd(formData);
+        await onAdd(submissionData);
         showSuccess(`Partner "${formData.partner_name}" added successfully`);
       }
       onClose();
@@ -440,18 +453,50 @@ export default function AddPartnerModal({ isOpen, onClose, onAdd, onEdit, editPa
                   </div>
 
                   {/* Commission */}
-                  <div>
-                    <label className="block text-sm font-medium text-blckbx-black mb-1">
-                      Commission
+                  <div className="col-span-2">
+                    <label className="flex items-center gap-2 cursor-pointer mb-2">
+                      <input
+                        type="checkbox"
+                        name="has_commission"
+                        checked={formData.has_commission}
+                        onChange={handleChange}
+                        className="custom-checkbox"
+                      />
+                      <span className="text-sm font-medium text-blckbx-black">Commission earned on this partnership</span>
                     </label>
-                    <input
-                      type="text"
-                      name="commission"
-                      value={formData.commission}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2.5 border border-blckbx-dark-sand rounded-lg bg-blckbx-sand/30 text-blckbx-black placeholder-blckbx-black/40 focus:border-blckbx-cta"
-                      placeholder="e.g., 10% or £50 per booking"
-                    />
+                    {formData.has_commission && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-blckbx-black mb-1">
+                            Commission Rate (%)
+                          </label>
+                          <input
+                            type="number"
+                            name="commission_rate"
+                            value={formData.commission_rate}
+                            onChange={handleChange}
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            className="w-full px-4 py-2.5 border border-blckbx-dark-sand rounded-lg bg-blckbx-sand/30 text-blckbx-black placeholder-blckbx-black/40 focus:border-blckbx-cta"
+                            placeholder="e.g., 10"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-blckbx-black mb-1">
+                            Commission Notes
+                          </label>
+                          <input
+                            type="text"
+                            name="commission"
+                            value={formData.commission}
+                            onChange={handleChange}
+                            className="w-full px-4 py-2.5 border border-blckbx-dark-sand rounded-lg bg-blckbx-sand/30 text-blckbx-black placeholder-blckbx-black/40 focus:border-blckbx-cta"
+                            placeholder="e.g., 10% or £50 per booking"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Partner Classification Section */}

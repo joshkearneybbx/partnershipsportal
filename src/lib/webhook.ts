@@ -37,6 +37,7 @@ export const sendToCore = async (partner: Partner): Promise<{ success: boolean; 
           when_not_to_use: partner.when_not_to_use,
           sla_notes: partner.sla_notes,
           commission: partner.commission,
+          has_commission: partner.has_commission ?? false,
           contacted: partner.contacted,
           call_booked: partner.call_booked,
           call_had: partner.call_had,

@@ -39,7 +39,6 @@ import {
   formatAmount,
   formatCompactAmount,
   calculateCommission,
-  parseCommission,
   fetchUploads,
   fetchTransactions,
   createUpload,
@@ -835,7 +834,7 @@ function PartnerDetailPanel({
   if (!partnerStats) return null;
 
   const { partner, transactionCount, totalRevenue, commissionEarned, lastTransaction, avgDealSize, ragStatus } = partnerStats;
-  const commissionRate = parseCommission(partner.commission);
+  const commissionRate = partner.commission_rate ?? 0;
 
   return (
     <AnimatePresence>

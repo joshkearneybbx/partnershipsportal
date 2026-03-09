@@ -183,16 +183,6 @@ export function extractMonth(dateStr: string): string {
   return `${year}-${String(month).padStart(2, '0')}`;
 }
 
-/**
- * Parse commission string to number (handles "10%" or "10")
- */
-export function parseCommission(commissionStr: string): number {
-  if (!commissionStr) return 0;
-  const clean = commissionStr.replace('%', '').trim();
-  const value = parseFloat(clean);
-  return isNaN(value) ? 0 : value;
-}
-
 function getDateKey(value: string | Date): string | null {
   const date = value instanceof Date ? value : new Date(value);
   if (isNaN(date.getTime())) return null;
@@ -475,7 +465,7 @@ export function getWeeklyData(transactions: ProcessedTransaction[]): WeeklyReven
       weekStart.setDate(date.getDate() - date.getDay()); // Sunday
       const weekKey = weekStart.toISOString().split('T')[0];
 
-      const commissionRate = parseCommission(tx.partner.commission);
+      const commissionRate = tx.partner.commission_rate ?? 0;
       const commission = calculateCommission(tx.amount, commissionRate);
 
       const existing = weekMap.get(weekKey);
@@ -524,7 +514,7 @@ export function processPartnerRevenue(
     if (shouldCountAsPartner && tx.partnerId && tx.partner) {
       totalRevenue += tx.amount;
 
-      const commissionRate = parseCommission(tx.partner.commission);
+      const commissionRate = tx.partner.commission_rate ?? 0;
       const commission = calculateCommission(tx.amount, commissionRate);
       totalCommission += commission;
 
