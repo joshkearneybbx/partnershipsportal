@@ -156,20 +156,9 @@ function UploadModal({
         const rows: { date: string; merchantName: string; amount: string }[] = [];
 
         console.log('[DEBUG] CSV lines count:', lines.length);
-        console.log('[DEBUG] First line (header?):', lines[0]);
-        console.log('[DEBUG] Second line (first data):', lines[1]);
         
-        for (let i = 1; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (!line) continue;
-          
-          // Skip if this looks like a header row
-          if (line.toLowerCase().includes('date') && line.toLowerCase().includes('merchant')) {
-            console.log('[DEBUG] Skipping header row:', line);
-            continue;
-          }
-
-          // Parse CSV respecting quoted fields
+        // Helper to parse a CSV line respecting quoted fields
+        const parseCSVLine = (line: string): string[] => {
           const parts: string[] = [];
           let current = '';
           let inQuotes = false;
@@ -180,62 +169,97 @@ function UploadModal({
             
             if (char === '"') {
               if (inQuotes && nextChar === '"') {
-                // Escaped quote inside quotes
                 current += '"';
-                j++; // Skip next quote
+                j++;
               } else {
-                // Toggle quote state
                 inQuotes = !inQuotes;
               }
             } else if (char === ',' && !inQuotes) {
-              // End of field
               parts.push(current.trim());
               current = '';
             } else {
               current += char;
             }
           }
-          // Don't forget the last field
           parts.push(current.trim());
           
           // Remove surrounding quotes from each field
-          const cleanParts = parts.map(p => p.replace(/^"|"$/g, ''));
+          return parts.map(p => p.replace(/^"|"$/g, ''));
+        };
+        
+        // Parse header row
+        const headerLine = lines[0];
+        const headers = parseCSVLine(headerLine).map(h => h.toLowerCase().trim());
+        console.log('[DEBUG] Headers:', headers);
+        
+        // Find column indices by header name
+        const findColumnIndex = (names: string[]): number => {
+          for (const name of names) {
+            const idx = headers.findIndex(h => h === name.toLowerCase());
+            if (idx !== -1) return idx;
+          }
+          return -1;
+        };
+        
+        const dateIdx = findColumnIndex(['date']);
+        const merchantIdx = findColumnIndex(['merchant name']);
+        const amountIdx = findColumnIndex(['amount', 'balance transaction']);
+        const typeIdx = findColumnIndex(['type']);
+        
+        console.log('[DEBUG] Column indices:', { dateIdx, merchantIdx, amountIdx, typeIdx });
+        
+        // Validate required columns exist
+        if (dateIdx === -1 || merchantIdx === -1 || amountIdx === -1) {
+          setError('CSV is missing required columns: Date, Merchant Name, and Amount (or Balance Transaction)');
+          return;
+        }
+        
+        const dateRegex = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
+        
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+
+          const cleanParts = parseCSVLine(line);
           
-          if (cleanParts.length >= 3) {
-            // Detect column order by checking which field looks like a date (DD/MM/YYYY)
-            const dateRegex = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
-            let dateField = cleanParts[0];
-            let merchantField = cleanParts[1];
-            let amountField = cleanParts[2];
-            
-            // If first field doesn't look like a date, try to find the date field
-            if (!dateRegex.test(dateField)) {
-              // Check if second field is the date
-              if (dateRegex.test(merchantField)) {
-                // Columns are: Merchant, Date, Amount
-                merchantField = cleanParts[0];
-                dateField = cleanParts[1];
-                amountField = cleanParts[2];
-              } else if (dateRegex.test(amountField)) {
-                // Columns are: Merchant, Amount, Date
-                merchantField = cleanParts[0];
-                amountField = cleanParts[1];
-                dateField = cleanParts[2];
-              }
+          // Skip if we don't have enough columns
+          if (cleanParts.length <= Math.max(dateIdx, merchantIdx, amountIdx)) {
+            console.log('[DEBUG] Skipping row - not enough columns:', cleanParts);
+            continue;
+          }
+          
+          // Skip rows where Type is not "capture" (if Type column exists)
+          if (typeIdx !== -1) {
+            const typeValue = cleanParts[typeIdx]?.toLowerCase().trim() || '';
+            if (typeValue !== '' && typeValue !== 'capture') {
+              console.log('[DEBUG] Skipping row - type is not capture:', { type: typeValue, line });
+              continue;
+            }
+          }
+          
+          const dateField = cleanParts[dateIdx];
+          const merchantField = cleanParts[merchantIdx];
+          const amountField = cleanParts[amountIdx];
+          
+          // Only add if we have a valid date
+          if (dateRegex.test(dateField)) {
+            // Validate amount is a numeric value
+            const cleanAmount = amountField.replace(/[£,]/g, '').trim();
+            const amountValue = parseFloat(cleanAmount);
+            if (isNaN(amountValue) || cleanAmount === '') {
+              console.log('[DEBUG] Skipping row - invalid amount:', { amount: amountField, cleanAmount, line });
+              continue;
             }
             
-            // Only add if we have a valid date
-            if (dateRegex.test(dateField)) {
-              const row = {
-                date: dateField,
-                merchantName: merchantField,
-                amount: amountField,
-              };
-              console.log('[DEBUG] Adding row:', row);
-              rows.push(row);
-            } else {
-              console.log('[DEBUG] Skipping row - no valid date found:', cleanParts);
-            }
+            const row = {
+              date: dateField,
+              merchantName: merchantField,
+              amount: amountField,
+            };
+            console.log('[DEBUG] Adding row:', row);
+            rows.push(row);
+          } else {
+            console.log('[DEBUG] Skipping row - no valid date found:', cleanParts);
           }
         }
 
