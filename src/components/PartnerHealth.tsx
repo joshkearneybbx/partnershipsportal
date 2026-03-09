@@ -53,7 +53,7 @@ import {
   getUploadForMonth,
 } from '@/lib/stripe';
 import { pb } from '@/lib/pocketbase';
-import { getBigPurchases, updateBigPurchase, updatePartner } from '@/lib/pocketbase';
+import { getBigPurchases, updateBigPurchase, updatePartner, upsertPartnerRevenue } from '@/lib/pocketbase';
 import { useToast } from '@/contexts/ToastContext';
 import { format, differenceInDays, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 
@@ -202,7 +202,7 @@ function UploadModal({
         };
         
         const dateIdx = findColumnIndex(['date']);
-        const merchantIdx = findColumnIndex(['merchant name']);
+        const merchantIdx = findColumnIndex(['merchant name', 'merchant']);
         const amountIdx = findColumnIndex(['amount', 'balance transaction']);
         const typeIdx = findColumnIndex(['type']);
         
@@ -522,6 +522,78 @@ function UploadModal({
       }));
 
       await batchCreateTransactions(transactionsWithUploadId, authToken, 50);
+
+      // Write partner revenue data to PocketBase
+      // Group matched transactions by partner + month
+      const revenueByPartnerMonth = new Map<string, {
+        partnerId: string;
+        partner: Partner | null;
+        month: string;
+        revenue: number;
+        transactionCount: number;
+      }>();
+
+      for (const tx of transactions) {
+        if (!tx.partner_id) continue;
+        
+        const txDate = new Date(tx.date);
+        const monthKey = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
+        const groupKey = `${tx.partner_id}-${monthKey}`;
+        
+        const existing = revenueByPartnerMonth.get(groupKey);
+        if (existing) {
+          existing.revenue += tx.amount;
+          existing.transactionCount++;
+        } else {
+          // Find partner data
+          const partner = signedPartners.find(p => p.id === tx.partner_id) || null;
+          revenueByPartnerMonth.set(groupKey, {
+            partnerId: tx.partner_id,
+            partner,
+            month: monthKey,
+            revenue: tx.amount,
+            transactionCount: 1,
+          });
+        }
+      }
+
+      // Upsert partner revenue records
+      let successCount = 0;
+      const now = new Date().toISOString();
+
+      for (const [, data] of revenueByPartnerMonth) {
+        if (!data.partner) continue;
+
+        const [year, month] = data.month.split('-').map(Number);
+        const periodStart = `${data.month}-01`;
+        // Last day of month
+        const lastDay = new Date(year, month, 0).getDate();
+        const periodEnd = `${data.month}-${String(lastDay).padStart(2, '0')}`;
+        
+        const commissionRate = data.partner.commission_rate ?? 0;
+        const commissionEarned = Math.round(data.revenue * (commissionRate / 100));
+
+        const result = await upsertPartnerRevenue({
+          partner: data.partnerId,
+          period_start: periodStart,
+          period_end: periodEnd,
+          revenue: data.revenue,
+          commission_earned: commissionEarned,
+          transaction_count: data.transactionCount,
+          source_filename: file?.name || 'unknown',
+          imported_at: now,
+        });
+
+        if (result.success) {
+          successCount++;
+        } else {
+          console.error(`[Partner Revenue] Failed to upsert for partner ${data.partnerId}, month ${data.month}`);
+        }
+      }
+
+      if (successCount > 0) {
+        showSuccess(`Revenue data saved for ${successCount} partner months`);
+      }
 
       const newAliasCount = confirmedMatches.length;
       showSuccess(

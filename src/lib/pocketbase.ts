@@ -4,6 +4,7 @@ import { BigPurchase, BigPurchaseCategory, Partner } from '@/types';
 const POCKETBASE_URL = 'https://pocketbase.blckbx.co.uk';
 const COLLECTION_NAME = 'partnership_portal';
 const BIG_PURCHASES_COLLECTION = 'big_purchases';
+const PARTNER_REVENUE_COLLECTION = 'partner_revenue';
 
 // Create PocketBase instance
 export const pb = new PocketBase(POCKETBASE_URL);
@@ -444,4 +445,82 @@ export const debugAuthState = () => {
     console.log('localStorage pocketbase_auth:', localStorage.getItem('pocketbase_auth'));
   }
   console.log('=============================');
+};
+
+// Partner Revenue types
+export interface PartnerRevenueRecord {
+  id?: string;
+  partner: string; // relation ID
+  period_start: string; // date
+  period_end: string; // date
+  revenue: number;
+  commission_earned: number;
+  transaction_count: number;
+  source_filename: string;
+  imported_at: string;
+}
+
+// Partner Revenue operations
+export const findPartnerRevenue = async (
+  partnerId: string,
+  periodStart: string
+): Promise<PartnerRevenueRecord | null> => {
+  try {
+    const records = await pb.collection(PARTNER_REVENUE_COLLECTION).getFullList({
+      filter: `partner = "${partnerId}" && period_start = "${periodStart}"`,
+      limit: 1,
+    });
+    return records.length > 0 ? (records[0] as unknown as PartnerRevenueRecord) : null;
+  } catch (error) {
+    console.error('[PocketBase] Error finding partner revenue:', error);
+    return null;
+  }
+};
+
+export const createPartnerRevenue = async (
+  data: Omit<PartnerRevenueRecord, 'id'>
+): Promise<PartnerRevenueRecord | null> => {
+  try {
+    const record = await pb.collection(PARTNER_REVENUE_COLLECTION).create(data);
+    return record as unknown as PartnerRevenueRecord;
+  } catch (error) {
+    console.error('[PocketBase] Error creating partner revenue:', error);
+    return null;
+  }
+};
+
+export const updatePartnerRevenue = async (
+  id: string,
+  data: Partial<PartnerRevenueRecord>
+): Promise<PartnerRevenueRecord | null> => {
+  try {
+    const record = await pb.collection(PARTNER_REVENUE_COLLECTION).update(id, data);
+    return record as unknown as PartnerRevenueRecord;
+  } catch (error) {
+    console.error('[PocketBase] Error updating partner revenue:', error);
+    return null;
+  }
+};
+
+export const upsertPartnerRevenue = async (
+  data: Omit<PartnerRevenueRecord, 'id'>
+): Promise<{ success: boolean; created: boolean }> => {
+  // Try to find existing record
+  const existing = await findPartnerRevenue(data.partner, data.period_start);
+  
+  if (existing?.id) {
+    // Update existing
+    const updated = await updatePartnerRevenue(existing.id, {
+      revenue: data.revenue,
+      commission_earned: data.commission_earned,
+      transaction_count: data.transaction_count,
+      source_filename: data.source_filename,
+      imported_at: data.imported_at,
+    });
+    return { success: !!updated, created: false };
+  } else {
+    // Create new
+    const created = await createPartnerRevenue(data);
+    return { success: !!created, created: true };
+  }
 };
