@@ -24,6 +24,7 @@ import {
   getPipelineStats,
   getBigPurchases,
   updateBigPurchase,
+  deleteBigPurchase,
   moveBigPurchaseToPotentialLead,
 } from '@/lib/pocketbase';
 import { sendToCore, sendToBrevo } from '@/lib/webhook';
@@ -307,6 +308,18 @@ export default function Home() {
     }
   };
 
+  const handleDeleteBigPurchase = async (id: string) => {
+    try {
+      await deleteBigPurchase(id);
+      setBigPurchases((current) => current.filter((purchase) => purchase.id !== id));
+      showSuccess('Big purchase deleted');
+    } catch (error) {
+      console.error('Error deleting big purchase:', error);
+      showError('Failed to delete big purchase');
+      throw error;
+    }
+  };
+
   const handleCloseModal = () => {
     setShowAddModal(false);
     setEditPartner(null);
@@ -448,6 +461,7 @@ export default function Home() {
                   partners={partners}
                   isLoading={isLoading}
                   onUpdate={handleUpdateBigPurchase}
+                  onDelete={handleDeleteBigPurchase}
                   onMoveToPotential={handleMoveBigPurchaseToPotentialLead}
                 />
               </motion.div>

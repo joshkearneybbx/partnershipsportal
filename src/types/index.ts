@@ -100,6 +100,7 @@ export interface BigPurchase {
   category: BigPurchaseCategory;
   commission_notes: string;
   status: BigPurchaseStatus;
+  contacted_partner?: boolean;
   invoiced: boolean;
   partner_id: string | null;
   moved_to_potential?: boolean;

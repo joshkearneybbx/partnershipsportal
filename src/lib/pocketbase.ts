@@ -306,7 +306,7 @@ export const getBigPurchases = async (): Promise<BigPurchase[]> => {
   try {
     const records = await pb.collection(BIG_PURCHASES_COLLECTION).getFullList({
       sort: '-created',
-      fields: 'id,partner_name,poc,estimated_amount,amount_to_invoice,purchase_date,need_by,priority,category,commission_notes,status,invoiced,partner_id,moved_to_potential,created,updated',
+      fields: 'id,partner_name,poc,estimated_amount,amount_to_invoice,purchase_date,need_by,priority,category,commission_notes,status,contacted_partner,invoiced,partner_id,moved_to_potential,created,updated',
     });
     return records as unknown as BigPurchase[];
   } catch (error) {
@@ -324,6 +324,15 @@ export const updateBigPurchase = async (
     return record as unknown as BigPurchase;
   } catch (error) {
     console.error('Error updating big purchase:', error);
+    throw error;
+  }
+};
+
+export const deleteBigPurchase = async (id: string): Promise<void> => {
+  try {
+    await pb.collection(BIG_PURCHASES_COLLECTION).delete(id);
+  } catch (error) {
+    console.error('Error deleting big purchase:', error);
     throw error;
   }
 };

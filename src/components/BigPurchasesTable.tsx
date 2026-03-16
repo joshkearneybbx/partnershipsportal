@@ -12,6 +12,7 @@ interface BigPurchasesTableProps {
   partners: Partner[];
   isLoading: boolean;
   onUpdate: (id: string, updates: Partial<BigPurchase>) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   onMoveToPotential: (purchase: BigPurchase) => Promise<void>;
 }
 
@@ -82,13 +83,16 @@ export default function BigPurchasesTable({
   partners,
   isLoading,
   onUpdate,
+  onDelete,
   onMoveToPotential,
 }: BigPurchasesTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [selectedPurchase, setSelectedPurchase] = useState<BigPurchase | null>(null);
+  const [purchaseToDelete, setPurchaseToDelete] = useState<BigPurchase | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filteredPurchases = useMemo(() => {
     const byStatus =
@@ -115,6 +119,25 @@ export default function BigPurchasesTable({
 
   const handleInvoicedToggle = async (purchase: BigPurchase, checked: boolean) => {
     await onUpdate(purchase.id, { invoiced: checked });
+  };
+
+  const handleContactedToggle = async (purchase: BigPurchase, checked: boolean) => {
+    await onUpdate(purchase.id, { contacted_partner: checked });
+  };
+
+  const handleDeletePurchase = async () => {
+    if (!purchaseToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      await onDelete(purchaseToDelete.id);
+      if (selectedPurchase?.id === purchaseToDelete.id) {
+        closeModal();
+      }
+      setPurchaseToDelete(null);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleModalSave = async () => {
@@ -209,7 +232,7 @@ export default function BigPurchasesTable({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px]">
+          <table className="w-full min-w-[1060px]">
             <thead>
               <tr className="text-left border-b border-blckbx-dark-sand bg-blckbx-dark-sand">
                 <th className="p-4 text-sm font-medium text-blckbx-black">Partner Name</th>
@@ -220,7 +243,9 @@ export default function BigPurchasesTable({
                 <th className="p-4 text-sm font-medium text-blckbx-black">Priority</th>
                 <th className="p-4 text-sm font-medium text-blckbx-black">Category</th>
                 <th className="p-4 text-sm font-medium text-blckbx-black">Status</th>
+                <th className="p-4 text-sm font-medium text-blckbx-black text-center">Contacted</th>
                 <th className="p-4 text-sm font-medium text-blckbx-black text-center">Invoiced</th>
+                <th className="p-4 text-sm font-medium text-blckbx-black text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -287,10 +312,31 @@ export default function BigPurchasesTable({
                   <td className="p-4 text-center" onClick={(event) => event.stopPropagation()}>
                     <input
                       type="checkbox"
+                      checked={!!purchase.contacted_partner}
+                      onChange={(event) => void handleContactedToggle(purchase, event.target.checked)}
+                      className="custom-checkbox"
+                    />
+                  </td>
+                  <td className="p-4 text-center" onClick={(event) => event.stopPropagation()}>
+                    <input
+                      type="checkbox"
                       checked={!!purchase.invoiced}
                       onChange={(event) => void handleInvoicedToggle(purchase, event.target.checked)}
                       className="custom-checkbox"
                     />
+                  </td>
+                  <td className="p-4 text-center" onClick={(event) => event.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() => setPurchaseToDelete(purchase)}
+                      className="inline-flex items-center justify-center rounded-lg bg-blckbx-sand/80 p-2 text-blckbx-black/55 transition-colors hover:bg-[#E6D7B8] hover:text-blckbx-black"
+                      title="Delete purchase"
+                      aria-label={`Delete purchase for ${purchase.partner_name}`}
+                    >
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
                   </td>
                 </motion.tr>
               ))}
@@ -568,6 +614,56 @@ export default function BigPurchasesTable({
                       {isSaving ? 'Saving...' : 'Save'}
                     </button>
                   </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {purchaseToDelete && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+              onClick={() => !isDeleting && setPurchaseToDelete(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            >
+              <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#232427] shadow-2xl">
+                <div className="border-b border-white/10 px-6 py-4">
+                  <h2 className="font-display text-xl text-[#F5F3F0]">Delete Purchase</h2>
+                </div>
+                <div className="px-6 py-5">
+                  <p className="text-sm leading-6 text-[#F5F3F0]/75">
+                    Are you sure you want to delete this purchase?
+                  </p>
+                  <p className="mt-2 text-sm text-[#F5F3F0]">{purchaseToDelete.partner_name}</p>
+                </div>
+                <div className="flex items-center justify-end gap-3 border-t border-white/10 px-6 py-4">
+                  <button
+                    type="button"
+                    onClick={() => setPurchaseToDelete(null)}
+                    disabled={isDeleting}
+                    className="rounded-lg border border-white/10 px-4 py-2 text-sm text-[#F5F3F0]/80 transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeletePurchase()}
+                    disabled={isDeleting}
+                    className="rounded-lg bg-[#D4A843] px-4 py-2 text-sm font-medium text-[#1C1D1F] transition-colors hover:bg-[#C49A38] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isDeleting ? 'Deleting...' : 'Delete'}
+                  </button>
                 </div>
               </div>
             </motion.div>
