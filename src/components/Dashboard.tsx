@@ -17,10 +17,21 @@ import {
 import { WeeklyStats, PipelineStats, Partner } from '@/types';
 import { format, subDays, isAfter } from 'date-fns';
 
+type DashboardTab = 'dashboard' | 'experts-dashboard' | 'clubs-dashboard';
+type DashboardLabels = {
+  entitySingular: string;
+  entityPlural: string;
+  categorySectionTitle: string;
+  recentActivitySubtitle: (partner: Partner) => string;
+};
+
 interface DashboardProps {
   weeklyStats: WeeklyStats;
   pipelineStats: PipelineStats;
   partners: Partner[];
+  activeDashboardTab?: DashboardTab;
+  onDashboardTabChange?: (tab: DashboardTab) => void;
+  labels?: DashboardLabels;
 }
 
 const COLORS = {
@@ -63,21 +74,44 @@ const CATEGORY_COLOR_MAP: Record<string, string> = {
 const FALLBACK_COLORS = ['#6366F1', '#84CC16', '#F97316', '#06B6D4', '#A855F7'];
 
 // Custom tooltip for category pie charts
-const CategoryTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: { color: string } }> }) => {
+const CategoryTooltip = ({
+  active,
+  payload,
+  entityPlural,
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; payload: { color: string } }>;
+  entityPlural: string;
+}) => {
   if (active && payload && payload.length) {
     const data = payload[0];
     return (
       <div className="bg-blckbx-black px-3 py-2 rounded-lg shadow-lg">
         <p className="text-blckbx-sand text-sm font-medium">{data.name}</p>
-        <p className="text-blckbx-sand/70 text-xs">{data.value} partners</p>
+        <p className="text-blckbx-sand/70 text-xs">{data.value} {entityPlural.toLowerCase()}</p>
       </div>
     );
   }
   return null;
 };
 
-export default function Dashboard({ weeklyStats, pipelineStats, partners }: DashboardProps) {
+const defaultLabels: DashboardLabels = {
+  entitySingular: 'Partner',
+  entityPlural: 'Partnerships',
+  categorySectionTitle: 'Lifestyle Categories',
+  recentActivitySubtitle: (partner) => `${partner.lifestyle_category} • ${partner.opportunity_type}`,
+};
+
+export default function Dashboard({
+  weeklyStats,
+  pipelineStats,
+  partners,
+  activeDashboardTab = 'dashboard',
+  onDashboardTabChange,
+  labels = defaultLabels,
+}: DashboardProps) {
   const [expandedStatus, setExpandedStatus] = useState<string | null>(null);
+  const dashboardLabels = labels ?? defaultLabels;
 
   const pieData = [
     { name: 'Closed', value: pipelineStats.closed, color: COLORS.closed },
@@ -146,6 +180,32 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
 
   return (
     <div className="space-y-8">
+      {onDashboardTabChange && (
+        <div className="inline-flex rounded-xl border border-blckbx-dark-sand bg-white p-1 shadow-sm">
+          {([
+            { id: 'dashboard', label: 'Partnerships' },
+            { id: 'experts-dashboard', label: 'Experts' },
+            { id: 'clubs-dashboard', label: 'Members Clubs' },
+          ] as { id: DashboardTab; label: string }[]).map((tab) => {
+            const isActive = activeDashboardTab === tab.id;
+
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onDashboardTabChange(tab.id)}
+                className={`relative rounded-lg px-5 py-2.5 text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-blckbx-cta text-white shadow-sm'
+                    : 'text-blckbx-black/60 hover:text-blckbx-black hover:bg-blckbx-sand/60'
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Leadership Summary */}
       <motion.section
         initial={{ opacity: 0, y: 20 }}
@@ -407,7 +467,7 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
           boxShadow: '0 4px 20px rgba(29, 28, 27, 0.3)'
         }}
       >
-        <h3 className="font-display text-xl font-semibold text-blckbx-sand mb-6">Lifestyle Categories by Status</h3>
+        <h3 className="font-display text-xl font-semibold text-blckbx-sand mb-6">{dashboardLabels.categorySectionTitle} by Status</h3>
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-6">
           {/* Potential Categories */}
           <div className="rounded-xl p-4"
@@ -442,7 +502,7 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
                           <Cell key={`potential-cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip content={<CategoryTooltip />} />
+                      <Tooltip content={<CategoryTooltip entityPlural={dashboardLabels.entityPlural} />} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -526,7 +586,7 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
                           <Cell key={`contacted-cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip content={<CategoryTooltip />} />
+                      <Tooltip content={<CategoryTooltip entityPlural={dashboardLabels.entityPlural} />} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -610,7 +670,7 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
                           <Cell key={`lead-cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip content={<CategoryTooltip />} />
+                      <Tooltip content={<CategoryTooltip entityPlural={dashboardLabels.entityPlural} />} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -674,7 +734,7 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
               <span className="text-sm text-blckbx-black/50">({pipelineStats.negotiation})</span>
             </div>
             {negotiationCategoryData.length === 0 ? (
-              <p className="text-blckbx-black/50 text-center py-8 text-sm">No partners in negotiation</p>
+              <p className="text-blckbx-black/50 text-center py-8 text-sm">No {dashboardLabels.entityPlural.toLowerCase()} in negotiation</p>
             ) : (
               <>
                 <div className="h-40">
@@ -694,7 +754,7 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
                           <Cell key={`neg-cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip content={<CategoryTooltip />} />
+                      <Tooltip content={<CategoryTooltip entityPlural={dashboardLabels.entityPlural} />} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -758,7 +818,7 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
               <span className="text-sm text-blckbx-black/50">({pipelineStats.signed})</span>
             </div>
             {signedCategoryData.length === 0 ? (
-              <p className="text-blckbx-black/50 text-center py-8 text-sm">No signed partners</p>
+              <p className="text-blckbx-black/50 text-center py-8 text-sm">No signed {dashboardLabels.entityPlural.toLowerCase()}</p>
             ) : (
               <>
                 <div className="h-40">
@@ -778,7 +838,7 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
                           <Cell key={`signed-cell-${index}`} fill={entry.color} />
                         ))}
                       </Pie>
-                      <Tooltip content={<CategoryTooltip />} />
+                      <Tooltip content={<CategoryTooltip entityPlural={dashboardLabels.entityPlural} />} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -901,7 +961,7 @@ export default function Dashboard({ weeklyStats, pipelineStats, partners }: Dash
                   </div>
                   <div>
                     <p className="font-medium text-blckbx-sand">{partner.partner_name}</p>
-                    <p className="text-sm text-blckbx-sand/50">{partner.lifestyle_category} • {partner.opportunity_type}</p>
+                    <p className="text-sm text-blckbx-sand/50">{dashboardLabels.recentActivitySubtitle(partner)}</p>
                   </div>
                 </div>
                 <div className="text-right">

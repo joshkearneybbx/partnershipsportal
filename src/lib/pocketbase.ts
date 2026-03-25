@@ -1,8 +1,10 @@
 import PocketBase from 'pocketbase';
-import { BigPurchase, BigPurchaseCategory, Partner } from '@/types';
+import { BigPurchase, BigPurchaseCategory, Expert, MembersClub, Partner, PipelineStats } from '@/types';
 
 const POCKETBASE_URL = 'https://pocketbase.blckbx.co.uk';
 const COLLECTION_NAME = 'partnership_portal';
+const EXPERTS_COLLECTION_NAME = 'experts_portal';
+const MEMBERS_CLUBS_COLLECTION_NAME = 'members_clubs_portal';
 const BIG_PURCHASES_COLLECTION = 'big_purchases';
 const PARTNER_REVENUE_COLLECTION = 'partner_revenue';
 
@@ -73,6 +75,30 @@ export const getPartnersByStatus = async (status: string): Promise<Partner[]> =>
   }
 };
 
+export const getExperts = async (): Promise<Expert[]> => {
+  try {
+    const records = await pb.collection(EXPERTS_COLLECTION_NAME).getFullList({
+      sort: '-created',
+    });
+    return records as unknown as Expert[];
+  } catch (error) {
+    console.error('Error fetching experts:', error);
+    return [];
+  }
+};
+
+export const getMembersClubs = async (): Promise<MembersClub[]> => {
+  try {
+    const records = await pb.collection(MEMBERS_CLUBS_COLLECTION_NAME).getFullList({
+      sort: '-created',
+    });
+    return records as unknown as MembersClub[];
+  } catch (error) {
+    console.error('Error fetching members clubs:', error);
+    return [];
+  }
+};
+
 export const createPartner = async (
   partner: Omit<Partner, 'id' | 'created' | 'updated'>
 ): Promise<Partner | null> => {
@@ -91,6 +117,30 @@ export const createPartner = async (
   }
 };
 
+export const createExpert = async (
+  expert: Omit<Expert, 'id' | 'created' | 'updated'>
+): Promise<Expert | null> => {
+  try {
+    const record = await pb.collection(EXPERTS_COLLECTION_NAME).create(expert);
+    return record as unknown as Expert;
+  } catch (error) {
+    console.error('Error creating expert:', error);
+    throw error;
+  }
+};
+
+export const createMembersClub = async (
+  club: Omit<MembersClub, 'id' | 'created' | 'updated'>
+): Promise<MembersClub | null> => {
+  try {
+    const record = await pb.collection(MEMBERS_CLUBS_COLLECTION_NAME).create(club);
+    return record as unknown as MembersClub;
+  } catch (error) {
+    console.error('Error creating members club:', error);
+    throw error;
+  }
+};
+
 export const updatePartner = async (
   id: string,
   updates: Partial<Partner>
@@ -100,6 +150,32 @@ export const updatePartner = async (
     return record as unknown as Partner;
   } catch (error) {
     console.error('Error updating partner:', error);
+    throw error;
+  }
+};
+
+export const updateExpert = async (
+  id: string,
+  updates: Partial<Expert>
+): Promise<Expert | null> => {
+  try {
+    const record = await pb.collection(EXPERTS_COLLECTION_NAME).update(id, updates);
+    return record as unknown as Expert;
+  } catch (error) {
+    console.error('Error updating expert:', error);
+    throw error;
+  }
+};
+
+export const updateMembersClub = async (
+  id: string,
+  updates: Partial<MembersClub>
+): Promise<MembersClub | null> => {
+  try {
+    const record = await pb.collection(MEMBERS_CLUBS_COLLECTION_NAME).update(id, updates);
+    return record as unknown as MembersClub;
+  } catch (error) {
+    console.error('Error updating members club:', error);
     throw error;
   }
 };
@@ -181,11 +257,87 @@ export const updatePartnerStatus = async (
   }
 };
 
+export const updateExpertStatus = async (
+  id: string,
+  newStatus: string,
+  currentStatus?: string
+): Promise<Expert | null> => {
+  try {
+    const existingRecord = await pb.collection(EXPERTS_COLLECTION_NAME).getOne(id);
+    const existingExpert = existingRecord as unknown as Expert;
+
+    const updates: Partial<Expert> = {
+      status: newStatus as Expert['status'],
+    };
+
+    if (currentStatus === 'contacted' && newStatus === 'lead') {
+      updates.lead_date = new Date().toISOString();
+    }
+
+    if (newStatus === 'signed' && !existingExpert.signed_at) {
+      updates.signed_at = new Date().toISOString();
+    }
+
+    const record = await pb.collection(EXPERTS_COLLECTION_NAME).update(id, updates);
+    return record as unknown as Expert;
+  } catch (error) {
+    console.error('Error updating expert status:', error);
+    throw error;
+  }
+};
+
+export const updateMembersClubStatus = async (
+  id: string,
+  newStatus: string,
+  currentStatus?: string
+): Promise<MembersClub | null> => {
+  try {
+    const existingRecord = await pb.collection(MEMBERS_CLUBS_COLLECTION_NAME).getOne(id);
+    const existingClub = existingRecord as unknown as MembersClub;
+
+    const updates: Partial<MembersClub> = {
+      status: newStatus as MembersClub['status'],
+    };
+
+    if (currentStatus === 'contacted' && newStatus === 'lead') {
+      updates.lead_date = new Date().toISOString();
+    }
+
+    if (newStatus === 'signed' && !existingClub.signed_at) {
+      updates.signed_at = new Date().toISOString();
+    }
+
+    const record = await pb.collection(MEMBERS_CLUBS_COLLECTION_NAME).update(id, updates);
+    return record as unknown as MembersClub;
+  } catch (error) {
+    console.error('Error updating members club status:', error);
+    throw error;
+  }
+};
+
 export const deletePartner = async (id: string): Promise<void> => {
   try {
     await pb.collection(COLLECTION_NAME).delete(id);
   } catch (error) {
     console.error('Error deleting partner:', error);
+    throw error;
+  }
+};
+
+export const deleteExpert = async (id: string): Promise<void> => {
+  try {
+    await pb.collection(EXPERTS_COLLECTION_NAME).delete(id);
+  } catch (error) {
+    console.error('Error deleting expert:', error);
+    throw error;
+  }
+};
+
+export const deleteMembersClub = async (id: string): Promise<void> => {
+  try {
+    await pb.collection(MEMBERS_CLUBS_COLLECTION_NAME).delete(id);
+  } catch (error) {
+    console.error('Error deleting members club:', error);
     throw error;
   }
 };
@@ -241,26 +393,34 @@ export const getWeeklyStats = async () => {
 };
 
 const calculateAvgDaysToSign = (signedPartners: Partner[]): number => {
-  if (signedPartners.length === 0) return 0;
+  const validDurations = signedPartners
+    .map((partner) => {
+      if (!partner.signed_at) return null;
 
-  const totalDays = signedPartners.reduce((acc, partner) => {
-    if (partner.signed_at) {
-      const created = new Date(partner.created);
-      const signed = new Date(partner.signed_at);
+      const startValue = partner.lead_date || partner.created;
+      const startDate = new Date(startValue);
+      const signedDate = new Date(partner.signed_at);
+
+      if (Number.isNaN(startDate.getTime()) || Number.isNaN(signedDate.getTime())) {
+        return null;
+      }
+
       const days = Math.ceil(
-        (signed.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)
+        (signedDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
       );
-      return acc + days;
-    }
-    return acc;
-  }, 0);
 
-  return Math.round(totalDays / signedPartners.length);
+      return days >= 0 ? days : null;
+    })
+    .filter((days): days is number => days !== null);
+
+  if (validDurations.length === 0) return 0;
+
+  return Math.round(validDurations.reduce((acc, days) => acc + days, 0) / validDurations.length);
 };
 
-export const getPipelineStats = async () => {
+const getPipelineStatsForCollection = async (collectionName: string): Promise<PipelineStats> => {
   try {
-    const records = await pb.collection(COLLECTION_NAME).getFullList();
+    const records = await pb.collection(collectionName).getFullList();
     const partners = records as unknown as Partner[];
 
     const closed = partners.filter((p) => p.status === 'closed').length;
@@ -280,10 +440,17 @@ export const getPipelineStats = async () => {
       total: closed + potential + contacted + leads + negotiation + signed,
     };
   } catch (error) {
-    console.error('Error fetching pipeline stats:', error);
+    console.error(`Error fetching pipeline stats for ${collectionName}:`, error);
     return { closed: 0, potential: 0, contacted: 0, leads: 0, negotiation: 0, signed: 0, total: 0 };
   }
 };
+
+export const getPipelineStats = async () => getPipelineStatsForCollection(COLLECTION_NAME);
+
+export const getExpertsPipelineStats = async () => getPipelineStatsForCollection(EXPERTS_COLLECTION_NAME);
+
+export const getMembersClubsPipelineStats = async () =>
+  getPipelineStatsForCollection(MEMBERS_CLUBS_COLLECTION_NAME);
 
 const mapBigPurchaseCategoryToLifestyle = (category: BigPurchaseCategory): Partner['lifestyle_category'] => {
   switch (category) {

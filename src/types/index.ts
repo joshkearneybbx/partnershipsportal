@@ -131,6 +131,85 @@ export interface PipelineStats {
   total: number;
 }
 
+export interface Expert {
+  id: string;
+  expert_name: string;
+  expertise: string;
+  expert_category: string;
+  status: PartnerStatus;
+  webinar_instructions: string;
+  website: string;
+  commission: string;
+  has_commission?: boolean;
+  commission_rate?: number;
+  partner_tier: PartnerTier;
+  lifecycle_stage: LifecycleStage;
+  is_default: boolean;
+  contacted: boolean;
+  call_booked: boolean;
+  call_had: boolean;
+  contract_sent: boolean;
+  contract_signed: boolean;
+  lead_date: string | null;
+  signed_at: string | null;
+  contact_name: string;
+  contact_position: string;
+  contact_phone: string;
+  contact_email: string;
+  created: string;
+  updated: string;
+}
+
+export interface MembersClub {
+  id: string;
+  club_name: string;
+  description: string;
+  status: PartnerStatus;
+  contact_name: string;
+  contact_position: string;
+  contact_phone: string;
+  contact_email: string;
+  website: string;
+  login_notes: string;
+  commission: string;
+  has_commission?: boolean;
+  commission_rate?: number;
+  partnership_link: string;
+  contacted: boolean;
+  call_booked: boolean;
+  call_had: boolean;
+  contract_sent: boolean;
+  contract_signed: boolean;
+  lead_date: string | null;
+  signed_at: string | null;
+  created: string;
+  updated: string;
+}
+
+export type AppTabType =
+  | 'dashboard'
+  | 'closed'
+  | 'potential'
+  | 'contacted'
+  | 'leads'
+  | 'negotiation'
+  | 'signed'
+  | 'all'
+  | 'partner-health'
+  | 'big-purchases'
+  | 'experts-dashboard'
+  | 'experts-contacted'
+  | 'experts-leads'
+  | 'experts-negotiation'
+  | 'experts-signed'
+  | 'experts-all'
+  | 'clubs-dashboard'
+  | 'clubs-contacted'
+  | 'clubs-leads'
+  | 'clubs-negotiation'
+  | 'clubs-signed'
+  | 'clubs-all';
+
 export interface AuthUser {
   id: string;
   email: string;
