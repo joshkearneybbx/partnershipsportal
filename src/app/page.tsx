@@ -361,6 +361,7 @@ export default function Home() {
       setShowAddModal(false);
     } catch (error) {
       console.error('Error creating partner:', error);
+      throw error;
     }
   };
 
@@ -371,6 +372,7 @@ export default function Home() {
       setShowAddModal(false);
     } catch (error) {
       console.error('Error creating expert:', error);
+      throw error;
     }
   };
 
@@ -381,6 +383,7 @@ export default function Home() {
       setShowAddModal(false);
     } catch (error) {
       console.error('Error creating members club:', error);
+      throw error;
     }
   };
 
@@ -390,6 +393,7 @@ export default function Home() {
       await loadData();
     } catch (error) {
       console.error('Error updating partner:', error);
+      throw error;
     }
   };
 
@@ -399,6 +403,7 @@ export default function Home() {
       await loadData();
     } catch (error) {
       console.error('Error updating expert:', error);
+      throw error;
     }
   };
 
@@ -408,6 +413,7 @@ export default function Home() {
       await loadData();
     } catch (error) {
       console.error('Error updating members club:', error);
+      throw error;
     }
   };
 

@@ -8,6 +8,82 @@ const MEMBERS_CLUBS_COLLECTION_NAME = 'members_clubs_portal';
 const BIG_PURCHASES_COLLECTION = 'big_purchases';
 const PARTNER_REVENUE_COLLECTION = 'partner_revenue';
 
+const removeEmptyValues = <T extends Record<string, unknown>>(payload: T, optionalKeys: string[]) => {
+  const nextPayload = { ...payload } as Record<string, unknown>;
+
+  optionalKeys.forEach((key) => {
+    const value = nextPayload[key];
+    if (value === null || value === undefined || value === '') {
+      delete nextPayload[key];
+    }
+  });
+
+  return nextPayload;
+};
+
+const normalizeStatusValue = (value: unknown): string => {
+  if (typeof value !== 'string') return '';
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'leads') return 'lead';
+  return normalized;
+};
+
+const titleCaseStatusValue = (value: string): string => {
+  if (value === 'lead') return 'Lead';
+  return value.charAt(0).toUpperCase() + value.slice(1);
+};
+
+const normalizeRecordStatus = <T extends { status?: unknown }>(record: T): T => ({
+  ...record,
+  status: normalizeStatusValue(record.status),
+});
+
+const hasStatusValidationError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object' || !('data' in error)) return false;
+  const pbError = error as { data?: { data?: Record<string, { code?: string }> } };
+  return pbError.data?.data?.status?.code === 'validation_invalid_value';
+};
+
+const createWithStatusFallback = async <T extends Record<string, unknown>>(
+  collectionName: string,
+  payload: T
+) => {
+  try {
+    return await pb.collection(collectionName).create(payload);
+  } catch (error) {
+    if (!hasStatusValidationError(error) || typeof payload.status !== 'string') {
+      throw error;
+    }
+
+    const fallbackPayload = {
+      ...payload,
+      status: titleCaseStatusValue(payload.status),
+    };
+    return await pb.collection(collectionName).create(fallbackPayload);
+  }
+};
+
+const updateWithStatusFallback = async <T extends Record<string, unknown>>(
+  collectionName: string,
+  id: string,
+  payload: T
+) => {
+  try {
+    return await pb.collection(collectionName).update(id, payload);
+  } catch (error) {
+    if (!hasStatusValidationError(error) || typeof payload.status !== 'string') {
+      throw error;
+    }
+
+    const fallbackPayload = {
+      ...payload,
+      status: titleCaseStatusValue(payload.status),
+    };
+    return await pb.collection(collectionName).update(id, fallbackPayload);
+  }
+};
+
 // Create PocketBase instance
 export const pb = new PocketBase(POCKETBASE_URL);
 
@@ -80,7 +156,7 @@ export const getExperts = async (): Promise<Expert[]> => {
     const records = await pb.collection(EXPERTS_COLLECTION_NAME).getFullList({
       sort: '-created',
     });
-    return records as unknown as Expert[];
+    return records.map((record) => normalizeRecordStatus(record as unknown as Expert)) as Expert[];
   } catch (error) {
     console.error('Error fetching experts:', error);
     return [];
@@ -92,7 +168,7 @@ export const getMembersClubs = async (): Promise<MembersClub[]> => {
     const records = await pb.collection(MEMBERS_CLUBS_COLLECTION_NAME).getFullList({
       sort: '-created',
     });
-    return records as unknown as MembersClub[];
+    return records.map((record) => normalizeRecordStatus(record as unknown as MembersClub)) as MembersClub[];
   } catch (error) {
     console.error('Error fetching members clubs:', error);
     return [];
@@ -121,10 +197,34 @@ export const createExpert = async (
   expert: Omit<Expert, 'id' | 'created' | 'updated'>
 ): Promise<Expert | null> => {
   try {
-    const record = await pb.collection(EXPERTS_COLLECTION_NAME).create(expert);
-    return record as unknown as Expert;
-  } catch (error) {
+    const payload = removeEmptyValues(
+      {
+        ...expert,
+        commission_rate: expert.has_commission ? Number(expert.commission_rate ?? 0) : undefined,
+      },
+      [
+        'expertise',
+        'expert_category',
+        'webinar_instructions',
+        'website',
+        'commission',
+        'commission_rate',
+        'lead_date',
+        'signed_at',
+        'contact_name',
+        'contact_position',
+        'contact_phone',
+        'contact_email',
+      ]
+    );
+    const record = await createWithStatusFallback(EXPERTS_COLLECTION_NAME, payload);
+    return normalizeRecordStatus(record as unknown as Expert);
+  } catch (error: unknown) {
     console.error('Error creating expert:', error);
+    if (error && typeof error === 'object' && 'data' in error) {
+      const pbError = error as { data?: { data?: Record<string, unknown> } };
+      console.error('[PocketBase] Expert error details:', JSON.stringify(pbError.data, null, 2));
+    }
     throw error;
   }
 };
@@ -133,10 +233,34 @@ export const createMembersClub = async (
   club: Omit<MembersClub, 'id' | 'created' | 'updated'>
 ): Promise<MembersClub | null> => {
   try {
-    const record = await pb.collection(MEMBERS_CLUBS_COLLECTION_NAME).create(club);
-    return record as unknown as MembersClub;
-  } catch (error) {
+    const payload = removeEmptyValues(
+      {
+        ...club,
+        commission_rate: club.has_commission ? Number(club.commission_rate ?? 0) : undefined,
+      },
+      [
+        'description',
+        'website',
+        'login_notes',
+        'commission',
+        'commission_rate',
+        'partnership_link',
+        'lead_date',
+        'signed_at',
+        'contact_name',
+        'contact_position',
+        'contact_phone',
+        'contact_email',
+      ]
+    );
+    const record = await createWithStatusFallback(MEMBERS_CLUBS_COLLECTION_NAME, payload);
+    return normalizeRecordStatus(record as unknown as MembersClub);
+  } catch (error: unknown) {
     console.error('Error creating members club:', error);
+    if (error && typeof error === 'object' && 'data' in error) {
+      const pbError = error as { data?: { data?: Record<string, unknown> } };
+      console.error('[PocketBase] Members club error details:', JSON.stringify(pbError.data, null, 2));
+    }
     throw error;
   }
 };
@@ -159,8 +283,33 @@ export const updateExpert = async (
   updates: Partial<Expert>
 ): Promise<Expert | null> => {
   try {
-    const record = await pb.collection(EXPERTS_COLLECTION_NAME).update(id, updates);
-    return record as unknown as Expert;
+    const payload = removeEmptyValues(
+      {
+        ...updates,
+        commission_rate:
+          updates.has_commission === false
+            ? undefined
+            : updates.commission_rate !== undefined
+            ? Number(updates.commission_rate)
+            : updates.commission_rate,
+      },
+      [
+        'expertise',
+        'expert_category',
+        'webinar_instructions',
+        'website',
+        'commission',
+        'commission_rate',
+        'lead_date',
+        'signed_at',
+        'contact_name',
+        'contact_position',
+        'contact_phone',
+        'contact_email',
+      ]
+    );
+    const record = await updateWithStatusFallback(EXPERTS_COLLECTION_NAME, id, payload);
+    return normalizeRecordStatus(record as unknown as Expert);
   } catch (error) {
     console.error('Error updating expert:', error);
     throw error;
@@ -172,8 +321,33 @@ export const updateMembersClub = async (
   updates: Partial<MembersClub>
 ): Promise<MembersClub | null> => {
   try {
-    const record = await pb.collection(MEMBERS_CLUBS_COLLECTION_NAME).update(id, updates);
-    return record as unknown as MembersClub;
+    const payload = removeEmptyValues(
+      {
+        ...updates,
+        commission_rate:
+          updates.has_commission === false
+            ? undefined
+            : updates.commission_rate !== undefined
+            ? Number(updates.commission_rate)
+            : updates.commission_rate,
+      },
+      [
+        'description',
+        'website',
+        'login_notes',
+        'commission',
+        'commission_rate',
+        'partnership_link',
+        'lead_date',
+        'signed_at',
+        'contact_name',
+        'contact_position',
+        'contact_phone',
+        'contact_email',
+      ]
+    );
+    const record = await updateWithStatusFallback(MEMBERS_CLUBS_COLLECTION_NAME, id, payload);
+    return normalizeRecordStatus(record as unknown as MembersClub);
   } catch (error) {
     console.error('Error updating members club:', error);
     throw error;
@@ -264,7 +438,7 @@ export const updateExpertStatus = async (
 ): Promise<Expert | null> => {
   try {
     const existingRecord = await pb.collection(EXPERTS_COLLECTION_NAME).getOne(id);
-    const existingExpert = existingRecord as unknown as Expert;
+    const existingExpert = normalizeRecordStatus(existingRecord as unknown as Expert);
 
     const updates: Partial<Expert> = {
       status: newStatus as Expert['status'],
@@ -278,8 +452,8 @@ export const updateExpertStatus = async (
       updates.signed_at = new Date().toISOString();
     }
 
-    const record = await pb.collection(EXPERTS_COLLECTION_NAME).update(id, updates);
-    return record as unknown as Expert;
+    const record = await updateWithStatusFallback(EXPERTS_COLLECTION_NAME, id, updates);
+    return normalizeRecordStatus(record as unknown as Expert);
   } catch (error) {
     console.error('Error updating expert status:', error);
     throw error;
@@ -293,7 +467,7 @@ export const updateMembersClubStatus = async (
 ): Promise<MembersClub | null> => {
   try {
     const existingRecord = await pb.collection(MEMBERS_CLUBS_COLLECTION_NAME).getOne(id);
-    const existingClub = existingRecord as unknown as MembersClub;
+    const existingClub = normalizeRecordStatus(existingRecord as unknown as MembersClub);
 
     const updates: Partial<MembersClub> = {
       status: newStatus as MembersClub['status'],
@@ -307,8 +481,8 @@ export const updateMembersClubStatus = async (
       updates.signed_at = new Date().toISOString();
     }
 
-    const record = await pb.collection(MEMBERS_CLUBS_COLLECTION_NAME).update(id, updates);
-    return record as unknown as MembersClub;
+    const record = await updateWithStatusFallback(MEMBERS_CLUBS_COLLECTION_NAME, id, updates);
+    return normalizeRecordStatus(record as unknown as MembersClub);
   } catch (error) {
     console.error('Error updating members club status:', error);
     throw error;
@@ -421,14 +595,14 @@ const calculateAvgDaysToSign = (signedPartners: Partner[]): number => {
 const getPipelineStatsForCollection = async (collectionName: string): Promise<PipelineStats> => {
   try {
     const records = await pb.collection(collectionName).getFullList();
-    const partners = records as unknown as Partner[];
+    const partners = records as Array<{ status?: unknown }>;
 
-    const closed = partners.filter((p) => p.status === 'closed').length;
-    const potential = partners.filter((p) => p.status === 'potential').length;
-    const contacted = partners.filter((p) => p.status === 'contacted').length;
-    const leads = partners.filter((p) => p.status === 'lead').length;
-    const negotiation = partners.filter((p) => p.status === 'negotiation').length;
-    const signed = partners.filter((p) => p.status === 'signed').length;
+    const closed = partners.filter((p) => normalizeStatusValue(p.status) === 'closed').length;
+    const potential = partners.filter((p) => normalizeStatusValue(p.status) === 'potential').length;
+    const contacted = partners.filter((p) => normalizeStatusValue(p.status) === 'contacted').length;
+    const leads = partners.filter((p) => normalizeStatusValue(p.status) === 'lead').length;
+    const negotiation = partners.filter((p) => normalizeStatusValue(p.status) === 'negotiation').length;
+    const signed = partners.filter((p) => normalizeStatusValue(p.status) === 'signed').length;
 
     return {
       closed,

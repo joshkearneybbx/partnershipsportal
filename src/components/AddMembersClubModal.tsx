@@ -113,7 +113,14 @@ export default function AddMembersClubModal({
     const { name, value, type } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
+      [name]:
+        type === 'checkbox'
+          ? (e.target as HTMLInputElement).checked
+          : type === 'number'
+          ? value === ''
+            ? 0
+            : Number(value)
+          : value,
     }));
   };
 
