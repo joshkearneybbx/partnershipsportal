@@ -21,6 +21,19 @@ const removeEmptyValues = <T extends Record<string, unknown>>(payload: T, option
   return nextPayload;
 };
 
+const removeNullishValues = <T extends Record<string, unknown>>(payload: T, optionalKeys: string[]) => {
+  const nextPayload = { ...payload } as Record<string, unknown>;
+
+  optionalKeys.forEach((key) => {
+    const value = nextPayload[key];
+    if (value === null || value === undefined) {
+      delete nextPayload[key];
+    }
+  });
+
+  return nextPayload;
+};
+
 const normalizeStatusValue = (value: unknown): string => {
   if (typeof value !== 'string') return '';
 
@@ -32,6 +45,11 @@ const normalizeStatusValue = (value: unknown): string => {
 const titleCaseStatusValue = (value: string): string => {
   if (value === 'lead') return 'Lead';
   return value.charAt(0).toUpperCase() + value.slice(1);
+};
+
+const serializeCollectionStatusValue = (value: unknown) => {
+  const normalized = normalizeStatusValue(value);
+  return normalized ? titleCaseStatusValue(normalized) : value;
 };
 
 const normalizeRecordStatus = <T extends { status?: unknown }>(record: T): T => ({
@@ -200,6 +218,7 @@ export const createExpert = async (
     const payload = removeEmptyValues(
       {
         ...expert,
+        status: serializeCollectionStatusValue(expert.status),
         commission_rate: expert.has_commission ? Number(expert.commission_rate ?? 0) : undefined,
       },
       [
@@ -236,6 +255,7 @@ export const createMembersClub = async (
     const payload = removeEmptyValues(
       {
         ...club,
+        status: serializeCollectionStatusValue(club.status),
         commission_rate: club.has_commission ? Number(club.commission_rate ?? 0) : undefined,
       },
       [
@@ -283,9 +303,13 @@ export const updateExpert = async (
   updates: Partial<Expert>
 ): Promise<Expert | null> => {
   try {
-    const payload = removeEmptyValues(
+    const payload = removeNullishValues(
       {
         ...updates,
+        status:
+          updates.status !== undefined
+            ? serializeCollectionStatusValue(updates.status)
+            : updates.status,
         commission_rate:
           updates.has_commission === false
             ? undefined
@@ -321,9 +345,13 @@ export const updateMembersClub = async (
   updates: Partial<MembersClub>
 ): Promise<MembersClub | null> => {
   try {
-    const payload = removeEmptyValues(
+    const payload = removeNullishValues(
       {
         ...updates,
+        status:
+          updates.status !== undefined
+            ? serializeCollectionStatusValue(updates.status)
+            : updates.status,
         commission_rate:
           updates.has_commission === false
             ? undefined
@@ -441,7 +469,7 @@ export const updateExpertStatus = async (
     const existingExpert = normalizeRecordStatus(existingRecord as unknown as Expert);
 
     const updates: Partial<Expert> = {
-      status: newStatus as Expert['status'],
+      status: serializeCollectionStatusValue(newStatus) as Expert['status'],
     };
 
     if (currentStatus === 'contacted' && newStatus === 'lead') {
@@ -470,7 +498,7 @@ export const updateMembersClubStatus = async (
     const existingClub = normalizeRecordStatus(existingRecord as unknown as MembersClub);
 
     const updates: Partial<MembersClub> = {
-      status: newStatus as MembersClub['status'],
+      status: serializeCollectionStatusValue(newStatus) as MembersClub['status'],
     };
 
     if (currentStatus === 'contacted' && newStatus === 'lead') {
